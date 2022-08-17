@@ -1,0 +1,8 @@
+-t
+-r
+-s
+12345678
+-d
+1234
+-S
+tests/cases/07_03_invalid_json_format.before.json

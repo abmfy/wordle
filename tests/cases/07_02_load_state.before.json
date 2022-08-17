@@ -1,0 +1,66 @@
+{
+  "total_rounds": 6,
+  "games": [
+    {
+      "answer": "POSER",
+      "guesses": [
+        "HELLO",
+        "CRANE",
+        "POWER",
+        "POKER",
+        "POSER"
+      ]
+    },
+    {
+      "answer": "HIPPY",
+      "guesses": [
+        "CRANE",
+        "PLOTS",
+        "HELLO",
+        "HAPPY",
+        "HIPPY"
+      ]
+    },
+    {
+      "answer": "WRUNG",
+      "guesses": [
+        "DREAM",
+        "TERAS",
+        "BRING",
+        "WRONG",
+        "WRUNG"
+      ]
+    },
+    {
+      "answer": "SMOCK",
+      "guesses": [
+        "CRANE",
+        "TICKS",
+        "AUDIO",
+        "SHOCK",
+        "SMOCK"
+      ]
+    },
+    {
+      "answer": "SNEAK",
+      "guesses": [
+        "WORLD",
+        "NIGHT",
+        "AUDIO",
+        "MEANS",
+        "SNEAK"
+      ]
+    },
+    {
+      "answer": "SPURN",
+      "guesses": [
+        "CRANE",
+        "HELLO",
+        "CARGO",
+        "RAINS",
+        "SPIRT",
+        "SPURN"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+--config
+tests/cases/08_02_config_override.config.json
+-r
+--seed
+19700101
+-a
+tests/data/06_01_specify_word_list_acceptable.txt
+-f
+tests/data/06_01_specify_word_list_final.txt

@@ -1,0 +1,9 @@
+{
+    "stats": true,
+    "difficult": false,
+    "random": true,
+    "day": 1024,
+    "seed": 20220123,
+    "final_set": "tests/data/06_02_invalid_word_list_final.txt",
+    "acceptable_set": "tests/data/06_02_invalid_word_list_acceptable.txt"
+}

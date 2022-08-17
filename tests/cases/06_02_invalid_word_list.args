@@ -1,0 +1,4 @@
+--acceptable-set
+tests/data/06_02_invalid_word_list_acceptable.txt
+--final-set
+tests/data/06_02_invalid_word_list_final.txt

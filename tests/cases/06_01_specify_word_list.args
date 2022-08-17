@@ -1,0 +1,10 @@
+-t
+-a
+tests/data/06_01_specify_word_list_acceptable.txt
+-f
+tests/data/06_01_specify_word_list_final.txt
+-r
+-s
+20220817
+-d
+817
