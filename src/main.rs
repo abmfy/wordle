@@ -1,7 +1,7 @@
 use clap::{Parser, ArgGroup};
 use console;
 use rand::Rng;
-use std::{io::{self, Write}};
+use std::{io::{self, Write}, collections::HashSet};
 
 mod builtin_words;
 mod game;
@@ -116,71 +116,104 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Welcome, {}!", line.trim());
     }
 
-    // Did not provide answer
-    let mut game = if args.word.is_none() {
-        // Random mode
-        if args.random {
-            let index = rand::thread_rng().gen_range(0..builtin_words::FINAL.len());
-            Game::new(builtin_words::FINAL[index], args.difficult).unwrap()
-        } else {
-            if is_tty {
-                println!("Please choose an answer for the game.");
-            }
-            loop {
-                let answer: String = match read_line() {
-                    Some(word) => word,
-                    None => return exit_game(is_tty)
-                };
-                let answer = answer.to_lowercase();
-                match Game::new(&answer, args.difficult) {
-                    Ok(game) => break game,
-                    Err(error) => print_error(is_tty, &error)
-                }
-            }
-        }
-        
-    } else {
-        Game::new(args.word.unwrap().as_ref(), args.difficult).unwrap()
-    };
+    // Avoid word recurrence when in random mode
+    let mut used_answers = HashSet::<usize>::new();
 
+    // Game loop
     loop {
-        if is_tty {
-            print!("{}", console::style(format!("Guess {}: ", game.get_round() + 1)).blue());
-            flush();
-        }
-
-        let word: String = match read_line() {
-            Some(word) => word,
-            None => return exit_game(is_tty)
-        };
-        let word = word.to_lowercase();
-        let result = game.guess(&word);
-        match result {
-            Ok((game_status, guesses, alphabet)) => {
-                if is_tty {
-                    print_guess_history(guesses);
-                    println!("--------------");
-                    print_alphabet(alphabet);
-                    match game_status {
-                        GameStatus::Won(round) => break println!("You won in {round} guesses!"),
-                        GameStatus::Failed(answer) => break println!("You lose! The answer is: {}", answer.to_uppercase()),
-                        GameStatus::Going => ()
+        // Did not provide answer
+        let mut game = if args.word.is_none() {
+            // Random mode
+            if args.random {
+                let index = loop {
+                    let now = rand::thread_rng().gen_range(0..builtin_words::FINAL.len());
+                    if !used_answers.contains(&now) {
+                        used_answers.insert(now);
+                        break now
+                    } else {
+                        continue
                     }
-                } else {
-                    print_status(&guesses.last().unwrap().1);
-                    print!(" ");
-                    print_status(alphabet);
-                    println!("");
-                    match game_status {
-                        GameStatus::Won(round) => break println!("CORRECT {round}"),
-                        GameStatus::Failed(answer) => break println!("FAILED {}", answer.to_uppercase()),
-                        GameStatus::Going => ()
+                };
+
+                Game::new(builtin_words::FINAL[index], args.difficult).unwrap()
+            } else {
+                if is_tty {
+                    println!("Please choose an answer for the game.");
+                }
+                loop {
+                    let answer: String = match read_line() {
+                        Some(word) => word,
+                        None => return exit_game(is_tty)
+                    };
+                    let answer = answer.to_lowercase();
+                    match Game::new(&answer, args.difficult) {
+                        Ok(game) => break game,
+                        Err(error) => print_error(is_tty, &error)
                     }
                 }
-            },
-            Err(error) => print_error(is_tty, &error)
+            }
+            
+        } else {
+            Game::new(args.word.as_ref().unwrap(), args.difficult).unwrap()
+        };
+
+        loop {
+            if is_tty {
+                print!("{}", console::style(format!("Guess {}: ", game.get_round() + 1)).blue());
+                flush();
+            }
+
+            let word: String = match read_line() {
+                Some(word) => word,
+                None => return exit_game(is_tty)
+            };
+            let word = word.to_lowercase();
+            let result = game.guess(&word);
+            match result {
+                Ok((game_status, guesses, alphabet)) => {
+                    if is_tty {
+                        print_guess_history(guesses);
+                        println!("--------------");
+                        print_alphabet(alphabet);
+                        match game_status {
+                            GameStatus::Won(round) => break println!("You won in {round} guesses!"),
+                            GameStatus::Failed(answer) => break println!("You lose! The answer is: {}", answer.to_uppercase()),
+                            GameStatus::Going => ()
+                        }
+                    } else {
+                        print_status(&guesses.last().unwrap().1);
+                        print!(" ");
+                        print_status(alphabet);
+                        println!("");
+                        match game_status {
+                            GameStatus::Won(round) => break println!("CORRECT {round}"),
+                            GameStatus::Failed(answer) => break println!("FAILED {}", answer.to_uppercase()),
+                            GameStatus::Going => ()
+                        }
+                    }
+                },
+                Err(error) => print_error(is_tty, &error)
+            }
+        }
+        // Ask whether to start a new game
+        if is_tty && args.word.is_none() {
+            loop {
+                print!("Would you like to start a new game? {} ", console::style("[Y/N]").bold());
+                flush();
+                match read_line() {
+                    None => return Ok(()),
+                    Some(line) => {
+                        match line.as_str() {
+                            "Y" | "y" => break,
+                            "N" | "n" => return exit_game(is_tty),
+                            _ => continue
+                        }
+                    }
+                }
+            }
+
+        } else {
+            return exit_game(is_tty);
         }
     }
-
-    Ok(())
 }
