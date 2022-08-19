@@ -19,11 +19,15 @@ struct Args {
 
     /// Randomly choose the answer
     #[clap(short, long)]
-    random: bool
+    random: bool,
+
+    /// Enter difficult mode, where you must guess according to the former result
+    #[clap(short='D', long)]
+    difficult: bool
 }
 
 fn is_in_answer_list(word: &str) -> Result<String, String> {
-    if builtin_words::FINAL.contains(&word.to_lowercase().as_ref()) {
+    if builtin_words::FINAL.binary_search(&word.to_lowercase().as_ref()).is_ok() {
         Ok(word.to_string())
     } else {
         Err(game::Error::BadAnswer.what())
@@ -117,7 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Random mode
         if args.random {
             let index = rand::thread_rng().gen_range(0..builtin_words::FINAL.len());
-            Game::new(builtin_words::FINAL[index]).unwrap()
+            Game::new(builtin_words::FINAL[index], args.difficult).unwrap()
         } else {
             if is_tty {
                 println!("Please choose an answer for the game.");
@@ -128,7 +132,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     None => return exit_game(is_tty)
                 };
                 let answer = answer.to_lowercase();
-                match Game::new(&answer) {
+                match Game::new(&answer, args.difficult) {
                     Ok(game) => break game,
                     Err(error) => print_error(is_tty, &error)
                 }
@@ -136,7 +140,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         
     } else {
-        Game::new(args.word.unwrap().as_ref()).unwrap()
+        Game::new(args.word.unwrap().as_ref(), args.difficult).unwrap()
     };
 
     loop {

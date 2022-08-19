@@ -15,6 +15,7 @@ pub enum Error {
     UnexpectedWordLength,
     UnknownWord,
     BadAnswer,
+    HintUnused
 }
 
 impl Error {
@@ -26,7 +27,9 @@ impl Error {
             Self::UnknownWord =>
                 String::from("Unknown word, please retry again."),
             Self::BadAnswer =>
-                String::from("That seems not suitable for a Wordle game. Maybe pick another?")
+                String::from("That seems not suitable for a Wordle game. Maybe pick another?"),
+            Self::HintUnused =>
+                String::from("You must use the hint in difficult mode.")
         }
     }
 }
@@ -75,12 +78,13 @@ pub enum GameStatus {
 pub struct Game {
     answer: String,
     guesses: Vec<(String, GuessStatus)>,
-    alphabet: Alphabet
+    alphabet: Alphabet,
+    difficult: bool
 }
 
 impl Game {
     /// Start a new game with given answer
-    pub fn new(answer: &str) -> Result<Self, Error> {
+    pub fn new(answer: &str, difficult: bool) -> Result<Self, Error> {
         // Provided answer not in good answer list
         if ANSWER_LIST.binary_search(&answer).is_err() {
             return Err(Error::BadAnswer)
@@ -88,7 +92,8 @@ impl Game {
         Ok(Self {
             answer: answer.to_string(),
             guesses: vec![],
-            alphabet: [LetterStatus::Unknown; ALPHABET_SIZE]
+            alphabet: [LetterStatus::Unknown; ALPHABET_SIZE],
+            difficult
         })
     }
 
@@ -98,7 +103,7 @@ impl Game {
     }
 
     /// Get the status of a guess
-    fn get_guess_status(&self, word: &str) -> GuessStatus {
+    fn get_guess_status(&self, word: &str) -> Result<GuessStatus, Error> {
         // Auxiliary type and function for counting occurrence of letters
         type Counter = HashMap<char, usize>;
         fn count(counter: &mut Counter, letter: char) -> usize {
@@ -112,6 +117,39 @@ impl Game {
         self.answer.chars().for_each(|c| {
             count(&mut ans_counter, c);
         });
+
+        // Difficult mode check
+        if self.difficult && self.get_round() > 0 {
+            let (last_guess, last_status) = self.guesses.last().unwrap();
+
+            let mut guess_counter = Counter::new();
+            word.chars().for_each(|c| {count(&mut guess_counter, c);});
+
+            // Count the occurrence of yellow and green letters for check
+            let mut last_guess_counter = Counter::new();
+
+            for ((i, last_letter), now_letter) in last_guess.chars().enumerate().zip(word.chars()) {
+                match last_status[i] {
+                    LetterStatus::Green => {
+                        // Green letters must stay green
+                        if now_letter != last_letter {
+                            return Err(Error::HintUnused);
+                        }
+                        count(&mut last_guess_counter, last_letter);
+                    }
+                    LetterStatus::Yellow => {
+                        count(&mut last_guess_counter, last_letter);
+                    }
+                    _ => ()
+                }
+            }
+
+            for (letter, count) in &last_guess_counter {
+                if guess_counter.get(letter).unwrap_or(&0) < count {
+                    return Err(Error::HintUnused);
+                }
+            }
+        }
 
         let mut result = [LetterStatus::Unknown; WORD_LENGTH];
 
@@ -137,7 +175,7 @@ impl Game {
                 LetterStatus::Red
             };
         });
-        result
+        Ok(result)
     }
 
     /// Update the alphabet based on the result of a guess
@@ -159,7 +197,7 @@ impl Game {
             return Err(Error::UnknownWord);
         }
 
-        let guess_status = self.get_guess_status(word);
+        let guess_status = self.get_guess_status(word)?;
         self.update_alphabet(word, &guess_status);
         self.guesses.push((word.to_string(), guess_status));
 
