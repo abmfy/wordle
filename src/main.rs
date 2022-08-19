@@ -1,6 +1,7 @@
-use clap::{Parser};
+use clap::{Parser, ArgGroup};
 use console;
-use std::{io::{self, Write}, process::exit};
+use rand::Rng;
+use std::{io::{self, Write}};
 
 mod builtin_words;
 mod game;
@@ -10,9 +11,15 @@ use game::{Game, LetterStatus, GuessStatus, GameStatus};
 /// Command line arguments
 #[derive(Parser, Debug)]
 #[clap(author="abmfy", about="A Wordle game, refined")]
+#[clap(group(ArgGroup::new("answer").args(&["word", "random"])))]
 struct Args {
+    /// Specify the answer
     #[clap(short, long, value_parser=is_in_answer_list)]
-    answer: Option<String>
+    word: Option<String>,
+
+    /// Randomly choose the answer
+    #[clap(short, long)]
+    random: bool
 }
 
 fn is_in_answer_list(word: &str) -> Result<String, String> {
@@ -23,11 +30,13 @@ fn is_in_answer_list(word: &str) -> Result<String, String> {
     }
 }
 
-/// Read a line, trimmed
-fn read_line() -> String {
+/// Read a line, trimmed. Return None if EOF encountered
+fn read_line() -> Option<String> {
     let mut line = String::new();
-    io::stdin().read_line(&mut line).unwrap();
-    line.trim().to_string()
+    match io::stdin().read_line(&mut line) {
+        Ok(0) | Err(_) => None,
+        Ok(_) => Some(line.trim().to_string())
+    }
 }
 
 /// Flush the output
@@ -72,11 +81,17 @@ fn print_alphabet(alphabet: &[LetterStatus]) {
     }    
 }
 
+/// Exit game and provided a message if in tty mode
+fn exit_game(is_tty: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if is_tty {
+        println!("Goodbye!");
+    }
+    Ok(())
+}
+
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-
-    // println!("{args:?}");
 
     let is_tty = atty::is(atty::Stream::Stdout);
     if is_tty {
@@ -97,18 +112,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Welcome, {}!", line.trim());
     }
 
-    let mut game = if args.answer.is_none() {
-        println!("Please choose an answer for the game.");
-        loop {
-            let answer: String = read_line();
-            let answer = answer.to_lowercase();
-            match Game::new(&answer) {
-                Ok(game) => break game,
-                Err(error) => print_error(is_tty, &error)
+    // Did not provide answer
+    let mut game = if args.word.is_none() {
+        // Random mode
+        if args.random {
+            let index = rand::thread_rng().gen_range(0..builtin_words::FINAL.len());
+            Game::new(builtin_words::FINAL[index]).unwrap()
+        } else {
+            if is_tty {
+                println!("Please choose an answer for the game.");
+            }
+            loop {
+                let answer: String = match read_line() {
+                    Some(word) => word,
+                    None => return exit_game(is_tty)
+                };
+                let answer = answer.to_lowercase();
+                match Game::new(&answer) {
+                    Ok(game) => break game,
+                    Err(error) => print_error(is_tty, &error)
+                }
             }
         }
+        
     } else {
-        Game::new(args.answer.unwrap().as_ref()).unwrap()
+        Game::new(args.word.unwrap().as_ref()).unwrap()
     };
 
     loop {
@@ -117,7 +145,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             flush();
         }
 
-        let word: String = read_line();
+        let word: String = match read_line() {
+            Some(word) => word,
+            None => return exit_game(is_tty)
+        };
         let word = word.to_lowercase();
         let result = game.guess(&word);
         match result {
