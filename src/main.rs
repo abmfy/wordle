@@ -1,10 +1,27 @@
+use clap::{Parser};
 use console;
-use std::io::{self, Write};
+use std::{io::{self, Write}, process::exit};
 
 mod builtin_words;
 mod game;
 
 use game::{Game, LetterStatus, GuessStatus, GameStatus};
+
+/// Command line arguments
+#[derive(Parser, Debug)]
+#[clap(author="abmfy", about="A Wordle game, refined")]
+struct Args {
+    #[clap(short, long, value_parser=is_in_answer_list)]
+    answer: Option<String>
+}
+
+fn is_in_answer_list(word: &str) -> Result<String, String> {
+    if builtin_words::FINAL.contains(&word.to_lowercase().as_ref()) {
+        Ok(word.to_string())
+    } else {
+        Err(game::Error::BadAnswer.what())
+    }
+}
 
 /// Read a line, trimmed
 fn read_line() -> String {
@@ -44,10 +61,10 @@ fn print_guess_history(guesses: &Vec<(String, GuessStatus)>) {
 
 // Print the alphabet, in tty mode
 fn print_alphabet(alphabet: &[LetterStatus]) {
-    const row1: &str = "qwertyuiop";
-    const row2: &str = "asdfghjkl";
-    const row3: &str = "zxcvbnm";
-    for row in [row1, row2, row3] {
+    const ROW1: &str = "qwertyuiop";
+    const ROW2: &str = "asdfghjkl";
+    const ROW3: &str = "zxcvbnm";
+    for row in [ROW1, ROW2, ROW3] {
         for c in row.chars() {
             print!("{}", alphabet[game::get_index(c)].colored_char(c.to_uppercase().nth(0).unwrap()));
         }
@@ -57,6 +74,10 @@ fn print_alphabet(alphabet: &[LetterStatus]) {
 
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+
+    // println!("{args:?}");
+
     let is_tty = atty::is(atty::Stream::Stdout);
     if is_tty {
         println!(
@@ -73,24 +94,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         flush();
         let mut line = String::new();
         io::stdin().read_line(&mut line)?;
-        println!("Welcome, {}! Please select an answer.", line.trim());
+        println!("Welcome, {}!", line.trim());
     }
 
-    // example: print arguments
-    // print!("Command line arguments: ");
-    // for arg in std::env::args() {
-    //     print!("{} ", arg);
-    // }
-    // println!("");
-    // TODO: parse the arguments in `args`
-
-    let mut game = loop {
-        let answer: String = read_line();
-        let answer = answer.to_lowercase();
-        match Game::new(&answer) {
-            Ok(game) => break game,
-            Err(error) => print_error(is_tty, &error)
+    let mut game = if args.answer.is_none() {
+        println!("Please choose an answer for the game.");
+        loop {
+            let answer: String = read_line();
+            let answer = answer.to_lowercase();
+            match Game::new(&answer) {
+                Ok(game) => break game,
+                Err(error) => print_error(is_tty, &error)
+            }
         }
+    } else {
+        Game::new(args.answer.unwrap().as_ref()).unwrap()
     };
 
     loop {
@@ -109,7 +127,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("--------------");
                     print_alphabet(alphabet);
                     match game_status {
-                        GameStatus::Won(round) => break println!("You won in {round} rounds!"),
+                        GameStatus::Won(round) => break println!("You won in {round} guesses!"),
                         GameStatus::Failed(answer) => break println!("You lose! The answer is: {}", answer.to_uppercase()),
                         GameStatus::Going => ()
                     }

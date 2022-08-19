@@ -10,6 +10,7 @@ const ALPHABET_SIZE: usize = 26;
 const WORD_LENGTH: usize = 5;
 const MAX_GAME_ROUND: usize = 6;
 
+#[derive(Debug)]
 pub enum Error {
     UnexpectedWordLength,
     UnknownWord,
@@ -94,11 +95,6 @@ impl Game {
     /// How many rounds has this game gone through
     pub fn get_round(&self) -> usize {
         self.guesses.len()
-    }
-
-    /// Get the guess history
-    pub fn get_guesses(&self) -> &Vec<(String, GuessStatus)> {
-        &self.guesses
     }
 
     /// Get the status of a guess
