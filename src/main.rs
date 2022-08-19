@@ -1,7 +1,7 @@
 use clap::{Parser, ArgGroup};
 use console;
 use rand::Rng;
-use std::{io::{self, Write}, collections::HashSet};
+use std::{io::{self, Write}, collections::{HashSet, HashMap}};
 
 mod builtin_words;
 mod game;
@@ -23,7 +23,19 @@ struct Args {
 
     /// Enter difficult mode, where you must guess according to the former result
     #[clap(short='D', long)]
-    difficult: bool
+    difficult: bool,
+
+    /// Show statistics
+    #[clap(short='t', long)]
+    stats: bool
+}
+
+/// Counter for counting words usage
+type Counter = HashMap<String, usize>;
+fn count(counter: &mut Counter, word: String) -> usize {
+    *counter.entry(word)
+        .and_modify(|cnt| *cnt += 1)
+        .or_insert(1)
 }
 
 fn is_in_answer_list(word: &str) -> Result<String, String> {
@@ -98,6 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let is_tty = atty::is(atty::Stream::Stdout);
+
     if is_tty {
         println!(
             "Welcome to {}{}{}{}{}{}!",
@@ -118,6 +131,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Avoid word recurrence when in random mode
     let mut used_answers = HashSet::<usize>::new();
+
+    // Statistics
+    let mut wins = 0;
+    let mut fails = 0;
+    let mut tries = 0;
+    let mut counter = Counter::new();
 
     // Game loop
     loop {
@@ -176,8 +195,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("--------------");
                         print_alphabet(alphabet);
                         match game_status {
-                            GameStatus::Won(round) => break println!("You won in {round} guesses!"),
-                            GameStatus::Failed(answer) => break println!("You lose! The answer is: {}", answer.to_uppercase()),
+                            GameStatus::Won(round) => {
+                                wins += 1;
+                                tries += round;
+                                for (word, _) in guesses {
+                                    count(&mut counter, word.to_string());
+                                }
+                                break println!("You won in {round} guesses!")
+                            },
+                            GameStatus::Failed(answer) => {
+                                fails += 1;
+                                for (word, _) in guesses {
+                                    count(&mut counter, word.to_string());
+                                }
+                                break println!("You lose! The answer is: {}", answer.to_uppercase())
+                            }
                             GameStatus::Going => ()
                         }
                     } else {
@@ -186,8 +218,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         print_status(alphabet);
                         println!("");
                         match game_status {
-                            GameStatus::Won(round) => break println!("CORRECT {round}"),
-                            GameStatus::Failed(answer) => break println!("FAILED {}", answer.to_uppercase()),
+                            GameStatus::Won(round) => {
+                                wins += 1;
+                                tries += round;
+                                for (word, _) in guesses {
+                                    count(&mut counter, word.to_string());
+                                }
+                                break println!("CORRECT {round}")
+                            }
+                            GameStatus::Failed(answer) => {
+                                fails += 1;
+                                for (word, _) in guesses {
+                                    count(&mut counter, word.to_string());
+                                }
+                                break println!("FAILED {}", answer.to_uppercase())
+                            },
                             GameStatus::Going => ()
                         }
                     }
@@ -195,13 +240,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(error) => print_error(is_tty, &error)
             }
         }
+
+        // Print statistics
+        if args.stats {
+            let average_tries = if wins == 0 {0.0} else {tries as f64 / wins as f64};
+
+            // Sort used words by usage times
+            let mut vec: Vec<(&String, &usize)> = counter.iter().collect();
+            vec.sort_by(|(word1, cnt1), (word2, cnt2)| {
+                if cnt1 != cnt2 {
+                    return cnt1.cmp(cnt2);
+                }
+                return word1.cmp(word2).reverse();
+            });
+
+            if is_tty {
+                println!("Statistics:");
+                println!("Wins: {wins} Fails: {fails}");
+                println!("Average tries of games won: {average_tries:.2}");
+                println!("Most frequently used words:");
+                for (word, count) in vec.iter().rev().take(5) {
+                    println!("    {}: used {count} times ", word.to_uppercase());
+                }
+            } else {
+                println!("{wins} {fails} {average_tries:.2}");
+
+                let mut first = true;
+                for (word, count) in vec.iter().rev().take(5) {
+                    if !first {
+                        print!(" ");
+                    }
+                    first = false;
+                    print!("{} {count}", word.to_uppercase());
+                }
+                println!("");
+
+                match read_line() {
+                    None => return exit_game(is_tty),
+                    Some(line) => {
+                        if line == "Y" {
+                            // Continue game loop
+                            continue;
+                        } else {
+                            return exit_game(is_tty);
+                        }
+                    }
+                }
+            }
+        }
+
         // Ask whether to start a new game
         if is_tty && args.word.is_none() {
             loop {
                 print!("Would you like to start a new game? {} ", console::style("[Y/N]").bold());
                 flush();
                 match read_line() {
-                    None => return Ok(()),
+                    None => return exit_game(is_tty),
                     Some(line) => {
                         match line.as_str() {
                             "Y" | "y" => break,
