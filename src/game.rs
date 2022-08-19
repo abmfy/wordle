@@ -45,9 +45,11 @@ impl LetterStatus {
         }
     }
 
-    pub fn colored_char(&self) -> StyledObject<char> {
-        console::style(self.to_char()).fg(match self {
-            Self::Unknown => Color::Cyan,
+    // Render letter c with the color of this status
+    pub fn colored_char(&self, c: char) -> StyledObject<char> {
+        console::style(c).fg(match self {
+            // Gray
+            Self::Unknown => Color::Color256(102),
             Self::Red     => Color::Red,
             Self::Yellow  => Color::Yellow,
             Self::Green   => Color::Green
@@ -55,8 +57,13 @@ impl LetterStatus {
     }
 }
 
-type GuessStatus = [LetterStatus; WORD_LENGTH];
-type Alphabet = [LetterStatus; ALPHABET_SIZE];
+pub type GuessStatus = [LetterStatus; WORD_LENGTH];
+pub type Alphabet = [LetterStatus; ALPHABET_SIZE];
+
+// Get the index of a letter in an alphabet 
+pub fn get_index(c: char) -> usize {
+    c as usize - 'a' as usize
+}
 
 pub enum GameStatus {
     Going,
@@ -89,6 +96,11 @@ impl Game {
         self.guesses.len()
     }
 
+    /// Get the guess history
+    pub fn get_guesses(&self) -> &Vec<(String, GuessStatus)> {
+        &self.guesses
+    }
+
     /// Get the status of a guess
     fn get_guess_status(&self, word: &str) -> GuessStatus {
         // Auxiliary type and function for counting occurrence of letters
@@ -107,16 +119,24 @@ impl Game {
 
         let mut result = [LetterStatus::Unknown; WORD_LENGTH];
 
+        // Firstly go through the guess to match correct letters
+        let mut visited = [false; 5];
+        for (i, c) in word.chars().enumerate() {
+            if self.answer.chars().nth(i).unwrap() == c {
+                visited[i] = true;
+                // This letter is matched, so decrement the count in answer counter
+                // is order that it won't be matched again
+                *ans_counter.get_mut(&c).unwrap() -= 1;
+            }
+        }
+
         let mut guess_counter = Counter::new();
         word.chars().enumerate().for_each(|(i, c)| {
             // Increment the occurrence count of current letter, and compare it with the one in answer
-            result[i] = if count(&mut guess_counter, c) <= *ans_counter.get(&c).unwrap_or(&0) {
-                // Letter correct
-                if self.answer.chars().nth(i).unwrap() == c {
-                    LetterStatus::Green
-                } else {
-                    LetterStatus::Yellow
-                }
+            result[i] = if visited[i] {
+                LetterStatus::Green
+            } else if count(&mut guess_counter, c) <= *ans_counter.get(&c).unwrap_or(&0) {
+                LetterStatus::Yellow
             } else {
                 LetterStatus::Red
             };
@@ -125,12 +145,7 @@ impl Game {
     }
 
     /// Update the alphabet based on the result of a guess
-    fn update_alphabet(&mut self, word: &str, status: &GuessStatus) {
-        // Get the index of a letter in an alphabet 
-        fn get_index(c: char) -> usize {
-            c as usize - 'a' as usize
-        }
-
+    fn update_alphabet(&mut self, word: &str, status: &GuessStatus) {        
         for (i, c) in word.chars().enumerate() {
             let index = get_index(c);
             // Update the state of the letters in the word
@@ -139,7 +154,7 @@ impl Game {
     }
 
     /// Make a guess
-    pub fn guess(&mut self, word: &str) -> Result<(GameStatus, GuessStatus, &Alphabet), Error> {
+    pub fn guess(&mut self, word: &str) -> Result<(GameStatus, &Vec<(String, GuessStatus)>, &Alphabet), Error> {
         if word.len() != WORD_LENGTH {
             return Err(Error::UnexpectedWordLength);
         }
@@ -163,6 +178,6 @@ impl Game {
             GameStatus::Going
         };
 
-        Ok((game_status, guess_status, &self.alphabet))
+        Ok((game_status, &self.guesses, &self.alphabet))
     }
 }
