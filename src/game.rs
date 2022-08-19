@@ -25,7 +25,7 @@ impl Error {
             Self::UnexpectedWordLength => 
                 format!("The length of a word should be {WORD_LENGTH}."),
             Self::UnknownWord =>
-                String::from("Unknown word, please retry again."),
+                String::from("Unknown word, please try again."),
             Self::BadAnswer =>
                 String::from("That seems not suitable for a Wordle game. Maybe pick another?"),
             Self::HintUnused =>

@@ -62,7 +62,11 @@ fn flush() {
 
 /// Print an error message
 fn print_error(is_tty: bool, error: &game::Error) {
-    println!("{}", if is_tty {error.what()} else {"INVALID".to_string()})
+    if is_tty {
+        println!("{}", console::style(error.what()).bold().red());
+    } else {
+        println!("INVALID");
+    }
 }
 
 /// Print status of letters, in non-tty mode
@@ -100,7 +104,7 @@ fn print_alphabet(alphabet: &[LetterStatus]) {
 /// Exit game and provided a message if in tty mode
 fn exit_game(is_tty: bool) -> Result<(), Box<dyn std::error::Error>> {
     if is_tty {
-        println!("Goodbye!");
+        println!("{}", console::style("Goodbye!").bold().green());
     }
     Ok(())
 }
@@ -113,7 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if is_tty {
         println!(
-            "Welcome to {}{}{}{}{}{}!",
+            "Welcome to {}{}{}{}{}{}!\n",
             console::style('W').bold().red(),
             console::style('o').bold().color256(208),
             console::style('r').bold().yellow(),
@@ -122,11 +126,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             console::style('e').bold().color256(93),
         );
 
-        print!("{}", console::style("Your name: ").bold().red());
+        print!("{}", console::style("Could I have your name, please? ").bold().blue());
         flush();
         let mut line = String::new();
         io::stdin().read_line(&mut line)?;
-        println!("Welcome, {}!", line.trim());
+        println!("Welcome, {}!\n", line.trim());
     }
 
     // Avoid word recurrence when in random mode
@@ -157,7 +161,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Game::new(builtin_words::FINAL[index], args.difficult).unwrap()
             } else {
                 if is_tty {
-                    println!("Please choose an answer for the game.");
+                    print!("{}", console::style("Please choose an answer for the game: ").bold().blue());
+                    flush()
                 }
                 loop {
                     let answer: String = match read_line() {
@@ -201,14 +206,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 for (word, _) in guesses {
                                     count(&mut counter, word.to_string());
                                 }
-                                break println!("You won in {round} guesses!")
+                                break println!("{}",
+                                    console::style(
+                                        format!("You won in {round} guesses!")
+                                    ).bold().magenta()
+                                )
                             },
                             GameStatus::Failed(answer) => {
                                 fails += 1;
                                 for (word, _) in guesses {
                                     count(&mut counter, word.to_string());
                                 }
-                                break println!("You lose! The answer is: {}", answer.to_uppercase())
+                                break println!("{}", 
+                                    console::style(
+                                        format!("You lose! The answer is: {}", answer.to_uppercase())
+                                    ).bold().red()
+                                )
                             }
                             GameStatus::Going => ()
                         }
@@ -255,12 +268,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
 
             if is_tty {
-                println!("Statistics:");
-                println!("Wins: {wins} Fails: {fails}");
-                println!("Average tries of games won: {average_tries:.2}");
-                println!("Most frequently used words:");
+                println!("{}", console::style("Statistics:").bold().yellow());
+                println!("{} {wins} {} {fails}",
+                    console::style("Wins:").bold().green(),
+                    console::style("Fails:").bold().red()
+                );
+                println!("{} {average_tries:.2}", console::style("Average tries of games won:").bold());
+                println!("{}", console::style("Most frequently used words:").bold().blue());
                 for (word, count) in vec.iter().rev().take(5) {
-                    println!("    {}: used {count} times ", word.to_uppercase());
+                    println!("    {}: used {count} times ", console::style(word.to_uppercase()).bold().magenta());
                 }
             } else {
                 println!("{wins} {fails} {average_tries:.2}");
@@ -292,13 +308,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Ask whether to start a new game
         if is_tty && args.word.is_none() {
             loop {
-                print!("Would you like to start a new game? {} ", console::style("[Y/N]").bold());
+                print!("Would you like to start a new game? {} ", console::style("[Y/N]").bold().blue());
                 flush();
                 match read_line() {
                     None => return exit_game(is_tty),
                     Some(line) => {
                         match line.as_str() {
-                            "Y" | "y" => break,
+                            "Y" | "y" => break println!(""),
                             "N" | "n" => return exit_game(is_tty),
                             _ => continue
                         }
