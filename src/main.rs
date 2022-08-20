@@ -2,24 +2,21 @@ use clap::Parser;
 use console;
 use rand::{seq::SliceRandom, SeedableRng};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs::File,
     io::{self, Read, Write},
     path::PathBuf,
-    process::exit,
+    process,
 };
 
 mod args;
 mod builtin_words;
 mod game;
+mod stats;
 
-use game::{Game, GameStatus, GuessStatus, LetterStatus};
-
-/// Counter for counting words usage
-type Counter = HashMap<String, usize>;
-fn count(counter: &mut Counter, word: String) -> usize {
-    *counter.entry(word).and_modify(|cnt| *cnt += 1).or_insert(1)
-}
+use args::Args;
+use game::{Error, Game, GameStatus, GuessStatus, LetterStatus};
+use stats::Stats;
 
 /// Read a line, trimmed. Return None if EOF encountered
 fn read_line() -> Option<String> {
@@ -47,7 +44,7 @@ fn flush() {
 }
 
 /// Print an error message
-fn print_error(is_tty: bool, error: &game::Error) {
+fn print_error(is_tty: bool, error: &Error) {
     if is_tty {
         println!("{}", console::style(error.what()).bold().red());
     } else {
@@ -93,17 +90,25 @@ fn print_alphabet(alphabet: &[LetterStatus]) {
     }
 }
 
-/// Exit game and provided a message if in tty mode
+/// Exit game normally and provide a message if in tty mode
 fn exit_game(is_tty: bool) -> ! {
     if is_tty {
         println!("{}", console::style("Goodbye!").bold().green());
     }
-    exit(0);
+    process::exit(0);
+}
+
+/// Exit game with error message and exit code 1
+fn exit_with_error(is_tty: bool, message: &str) -> ! {
+    if is_tty {
+        println!("{}", console::style(message).bold().red());
+    }
+    process::exit(1);
 }
 
 /// The main function for the Wordle game, implement your own logic here
 fn main() {
-    let args = args::Args::parse();
+    let args = Args::parse();
 
     let is_tty = atty::is(atty::Stream::Stdout);
 
@@ -111,7 +116,7 @@ fn main() {
     let mut day = args.day - 1;
 
     // Fetch acceptable words list
-    let word_list: Vec<String> = if let Some(ref path) = args.acceptable_file {
+    let mut word_list: Vec<String> = if let Some(ref path) = args.acceptable_set {
         read_word_list(&path)
     } else {
         builtin_words::ACCEPTABLE
@@ -120,14 +125,17 @@ fn main() {
             .collect()
     };
 
+    // Sort the word list to accelerate search
+    word_list.sort();
+
     // Fetch final words list
     let answer_list = {
-        let mut list: Vec<String> = if let Some(path) = args.final_file {
+        let mut list: Vec<String> = if let Some(path) = args.final_set {
             read_word_list(&path)
         } else {
             // If final words list not provided but acceptable list provided,
             // use the acceptable list as final words list
-            if let Some(_) = args.acceptable_file {
+            if let Some(_) = args.acceptable_set {
                 word_list.clone()
             } else {
                 builtin_words::FINAL.iter().map(|s| s.to_string()).collect()
@@ -138,13 +146,10 @@ fn main() {
         let final_set: HashSet<_> = list.iter().cloned().collect();
         let acceptable_set: HashSet<_> = word_list.iter().cloned().collect();
         if !final_set.is_subset(&acceptable_set) {
-            println!(
-                "{}",
-                console::style("Final words should be a subset of acceptable words!")
-                    .bold()
-                    .red()
-            );
-            exit(1);
+            exit_with_error(
+                is_tty,
+                "Final words should be a subset of acceptable words!",
+            )
         }
 
         // When in random mode, shuffle the word list
@@ -154,6 +159,22 @@ fn main() {
         }
         list
     };
+
+    // Argument validation
+    if day > answer_list.len() as u32 {
+        exit_with_error(
+            is_tty,
+            "Day should be less than or equal to the number of answers!",
+        );
+    }
+    if let Some(ref word) = args.word {
+        if !answer_list.contains(&word) {
+            exit_with_error(
+                is_tty,
+                "Provided answer is not in the answer words list!",
+            );
+        }
+    }
 
     // Print welcome message
     if is_tty {
@@ -182,11 +203,12 @@ fn main() {
         println!("Welcome, {}!\n", line.trim());
     }
 
-    // Statistics
-    let mut wins = 0;
-    let mut fails = 0;
-    let mut tries = 0;
-    let mut counter = Counter::new();
+    // Initiate statistics
+    let mut stats = if let Some(stats) = Stats::new(args.state) {
+        stats
+    } else {
+        exit_with_error(is_tty, "Failed to load stats: 'state.json' should be in JSON format");
+    };
 
     // Game loop
     loop {
@@ -236,7 +258,7 @@ fn main() {
         // Another day of playing wordle...
         // The mod is here to avoid overflow
         day += 1;
-        day %= answer_list.len() as u16;
+        day %= answer_list.len() as u32;
 
         loop {
             if is_tty {
@@ -255,30 +277,36 @@ fn main() {
             let result = game.guess(&word);
             match result {
                 Ok((game_status, guesses, alphabet)) => {
+                    // Print game status
                     if is_tty {
                         print_guess_history(guesses);
                         println!("--------------");
                         print_alphabet(alphabet);
-                        match game_status {
-                            GameStatus::Won(round) => {
-                                wins += 1;
-                                tries += round;
-                                for (word, _) in guesses {
-                                    count(&mut counter, word.to_string());
-                                }
-                                break println!(
+                    } else {
+                        print_status(&guesses.last().unwrap().1);
+                        print!(" ");
+                        print_status(alphabet);
+                        println!("");
+                    }
+                    // Handle win / fail
+                    match game_status {
+                        GameStatus::Won(round) => {
+                            stats.win(guesses);
+                            break if is_tty {
+                                println!(
                                     "{}",
                                     console::style(format!("You won in {round} guesses!"))
                                         .bold()
                                         .magenta()
-                                );
-                            }
-                            GameStatus::Failed(answer) => {
-                                fails += 1;
-                                for (word, _) in guesses {
-                                    count(&mut counter, word.to_string());
-                                }
-                                break println!(
+                                )
+                            } else {
+                                println!("CORRECT {round}")
+                            };
+                        }
+                        GameStatus::Failed(answer) => {
+                            stats.fail(guesses);
+                            break if is_tty {
+                                println!(
                                     "{}",
                                     console::style(format!(
                                         "You lose! The answer is: {}",
@@ -286,33 +314,12 @@ fn main() {
                                     ))
                                     .bold()
                                     .red()
-                                );
-                            }
-                            GameStatus::Going => (),
+                                )
+                            } else {
+                                println!("FAILED {}", answer.to_uppercase())
+                            };
                         }
-                    } else {
-                        print_status(&guesses.last().unwrap().1);
-                        print!(" ");
-                        print_status(alphabet);
-                        println!("");
-                        match game_status {
-                            GameStatus::Won(round) => {
-                                wins += 1;
-                                tries += round;
-                                for (word, _) in guesses {
-                                    count(&mut counter, word.to_string());
-                                }
-                                break println!("CORRECT {round}");
-                            }
-                            GameStatus::Failed(answer) => {
-                                fails += 1;
-                                for (word, _) in guesses {
-                                    count(&mut counter, word.to_string());
-                                }
-                                break println!("FAILED {}", answer.to_uppercase());
-                            }
-                            GameStatus::Going => (),
-                        }
+                        GameStatus::Going => (),
                     }
                 }
                 Err(error) => print_error(is_tty, &error),
@@ -321,67 +328,7 @@ fn main() {
 
         // Print statistics
         if args.stats {
-            let average_tries = if wins == 0 {
-                0.0
-            } else {
-                tries as f64 / wins as f64
-            };
-
-            // Sort used words by usage times
-            let mut vec: Vec<(&String, &usize)> = counter.iter().collect();
-            vec.sort_by(|(word1, cnt1), (word2, cnt2)| {
-                if cnt1 != cnt2 {
-                    return cnt1.cmp(cnt2);
-                }
-                return word1.cmp(word2).reverse();
-            });
-
-            if is_tty {
-                println!("{}", console::style("Statistics:").bold().yellow());
-                println!(
-                    "{} {wins} {} {fails}",
-                    console::style("Wins:").bold().green(),
-                    console::style("Fails:").bold().red()
-                );
-                println!(
-                    "{} {average_tries:.2}",
-                    console::style("Average tries of games won:").bold()
-                );
-                println!(
-                    "{}",
-                    console::style("Most frequently used words:").bold().blue()
-                );
-                for (word, count) in vec.iter().rev().take(5) {
-                    println!(
-                        "    {}: used {count} times ",
-                        console::style(word.to_uppercase()).bold().magenta()
-                    );
-                }
-            } else {
-                println!("{wins} {fails} {average_tries:.2}");
-
-                let mut first = true;
-                for (word, count) in vec.iter().rev().take(5) {
-                    if !first {
-                        print!(" ");
-                    }
-                    first = false;
-                    print!("{} {count}", word.to_uppercase());
-                }
-                println!("");
-
-                match read_line() {
-                    None => exit_game(is_tty),
-                    Some(line) => {
-                        if line == "Y" {
-                            // Continue game loop
-                            continue;
-                        } else {
-                            exit_game(is_tty);
-                        }
-                    }
-                }
-            }
+            stats.print(is_tty);
         }
 
         // Ask whether to start a new game
@@ -399,6 +346,18 @@ fn main() {
                         "N" | "n" => exit_game(is_tty),
                         _ => continue,
                     },
+                }
+            }
+        } else if !is_tty {
+            match read_line() {
+                None => exit_game(is_tty),
+                Some(line) => {
+                    if line == "Y" {
+                        // Continue game loop
+                        continue;
+                    } else {
+                        exit_game(is_tty);
+                    }
                 }
             }
         } else {

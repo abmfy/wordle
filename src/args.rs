@@ -2,7 +2,7 @@ use std::{fs::File, io::Read, path::PathBuf};
 
 use clap::Parser;
 
-use super::{builtin_words, read_word_list};
+use super::read_word_list;
 
 /// Command line arguments
 #[derive(Parser, Debug)]
@@ -26,9 +26,9 @@ pub struct Args {
 
     /// Specify current day
     #[clap(short, long, requires = "random", conflicts_with = "word", default_value_t = 1,
-        value_parser=clap::value_parser!(u16).range(1..=builtin_words::FINAL.len() as i64))
+        value_parser=clap::value_parser!(u32).range(1..))
     ]
-    pub day: u16,
+    pub day: u32,
 
     /// Specify random seed
     #[clap(
@@ -42,11 +42,15 @@ pub struct Args {
 
     /// Specify the final answer list
     #[clap(short, long, value_parser = is_valid_word_list, value_name = "FILE")]
-    pub final_file: Option<PathBuf>,
+    pub final_set: Option<PathBuf>,
 
     /// Specify the acceptable word list
     #[clap(short, long, value_parser = is_valid_word_list, value_name = "FILE")]
-    pub acceptable_file: Option<PathBuf>,
+    pub acceptable_set: Option<PathBuf>,
+
+    /// Whether to save and load state
+    #[clap(short, long)]
+    pub state: bool,
 }
 
 /// Check if a word list file is in valid format, and store the words

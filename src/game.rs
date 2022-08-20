@@ -204,7 +204,7 @@ impl<'a> Game<'a> {
             return Err(Error::UnexpectedWordLength);
         }
         // Word not in acceptable word list
-        if !self.word_list.contains(&word.to_string()) {
+        if self.word_list.binary_search(&word.to_string()).is_err() {
             return Err(Error::UnknownWord);
         }
 

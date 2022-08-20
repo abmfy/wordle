@@ -12,6 +12,8 @@ console = "0.15"
 text_io = "0.1.12"
 clap = { version = "3.2.17", features = ["derive"] }
 rand = "0.8.5"
+serde = { version = "1.0.143", features = ["derive"] }
+serde_derive = "1.0.143"
 
 [dev-dependencies]
 lazy_static = "1.0"
