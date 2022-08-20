@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use console::StyledObject;
 use console::Color;
+use console::StyledObject;
 
 use super::builtin_words::ACCEPTABLE as WORD_LIST;
 use super::builtin_words::FINAL as ANSWER_LIST;
@@ -15,37 +15,38 @@ pub enum Error {
     UnexpectedWordLength,
     UnknownWord,
     BadAnswer,
-    HintUnused
+    HintUnused,
 }
 
 impl Error {
     /// Get what happened
     pub fn what(&self) -> String {
         match self {
-            Self::UnexpectedWordLength => 
-                format!("The length of a word should be {WORD_LENGTH}."),
-            Self::UnknownWord =>
-                String::from("Unknown word, please try again."),
-            Self::BadAnswer =>
-                String::from("That seems not suitable for a Wordle game. Maybe pick another?"),
-            Self::HintUnused =>
-                String::from("You must use the hint in difficult mode.")
+            Self::UnexpectedWordLength => format!("The length of a word should be {WORD_LENGTH}."),
+            Self::UnknownWord => String::from("Unknown word, please try again."),
+            Self::BadAnswer => {
+                String::from("That seems not suitable for a Wordle game. Maybe pick another?")
+            }
+            Self::HintUnused => String::from("You must use the hint in difficult mode."),
         }
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LetterStatus {
-    Unknown, Red, Yellow, Green
+    Unknown,
+    Red,
+    Yellow,
+    Green,
 }
 
 impl LetterStatus {
     pub fn to_char(&self) -> char {
         match self {
             Self::Unknown => 'X',
-            Self::Red     => 'R',
-            Self::Yellow  => 'Y',
-            Self::Green   => 'G'
+            Self::Red => 'R',
+            Self::Yellow => 'Y',
+            Self::Green => 'G',
         }
     }
 
@@ -54,9 +55,9 @@ impl LetterStatus {
         console::style(c).fg(match self {
             // Gray
             Self::Unknown => Color::Color256(102),
-            Self::Red     => Color::Red,
-            Self::Yellow  => Color::Yellow,
-            Self::Green   => Color::Green
+            Self::Red => Color::Red,
+            Self::Yellow => Color::Yellow,
+            Self::Green => Color::Green,
         })
     }
 }
@@ -64,7 +65,7 @@ impl LetterStatus {
 pub type GuessStatus = [LetterStatus; WORD_LENGTH];
 pub type Alphabet = [LetterStatus; ALPHABET_SIZE];
 
-// Get the index of a letter in an alphabet 
+// Get the index of a letter in an alphabet
 pub fn get_index(c: char) -> usize {
     c as usize - 'a' as usize
 }
@@ -72,14 +73,14 @@ pub fn get_index(c: char) -> usize {
 pub enum GameStatus {
     Going,
     Won(usize),
-    Failed(String)
+    Failed(String),
 }
 
 pub struct Game {
     answer: String,
     guesses: Vec<(String, GuessStatus)>,
     alphabet: Alphabet,
-    difficult: bool
+    difficult: bool,
 }
 
 impl Game {
@@ -87,13 +88,13 @@ impl Game {
     pub fn new(answer: &str, difficult: bool) -> Result<Self, Error> {
         // Provided answer not in good answer list
         if ANSWER_LIST.binary_search(&answer).is_err() {
-            return Err(Error::BadAnswer)
+            return Err(Error::BadAnswer);
         }
         Ok(Self {
             answer: answer.to_string(),
             guesses: vec![],
             alphabet: [LetterStatus::Unknown; ALPHABET_SIZE],
-            difficult
+            difficult,
         })
     }
 
@@ -107,7 +108,8 @@ impl Game {
         // Auxiliary type and function for counting occurrence of letters
         type Counter = HashMap<char, usize>;
         fn count(counter: &mut Counter, letter: char) -> usize {
-            *counter.entry(letter)
+            *counter
+                .entry(letter)
                 .and_modify(|cnt| *cnt += 1)
                 .or_insert(1)
         }
@@ -123,7 +125,9 @@ impl Game {
             let (last_guess, last_status) = self.guesses.last().unwrap();
 
             let mut guess_counter = Counter::new();
-            word.chars().for_each(|c| {count(&mut guess_counter, c);});
+            word.chars().for_each(|c| {
+                count(&mut guess_counter, c);
+            });
 
             // Count the occurrence of yellow and green letters for check
             let mut last_guess_counter = Counter::new();
@@ -140,7 +144,7 @@ impl Game {
                     LetterStatus::Yellow => {
                         count(&mut last_guess_counter, last_letter);
                     }
-                    _ => ()
+                    _ => (),
                 }
             }
 
@@ -179,7 +183,7 @@ impl Game {
     }
 
     /// Update the alphabet based on the result of a guess
-    fn update_alphabet(&mut self, word: &str, status: &GuessStatus) {        
+    fn update_alphabet(&mut self, word: &str, status: &GuessStatus) {
         for (i, c) in word.chars().enumerate() {
             let index = get_index(c);
             // Update the state of the letters in the word
@@ -188,7 +192,10 @@ impl Game {
     }
 
     /// Make a guess
-    pub fn guess(&mut self, word: &str) -> Result<(GameStatus, &Vec<(String, GuessStatus)>, &Alphabet), Error> {
+    pub fn guess(
+        &mut self,
+        word: &str,
+    ) -> Result<(GameStatus, &Vec<(String, GuessStatus)>, &Alphabet), Error> {
         if word.len() != WORD_LENGTH {
             return Err(Error::UnexpectedWordLength);
         }
