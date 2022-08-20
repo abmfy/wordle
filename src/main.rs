@@ -3,6 +3,7 @@ use console;
 use rand::{seq::SliceRandom, SeedableRng};
 use std::{
     collections::HashSet,
+    env,
     fs::File,
     io::{self, Read, Write},
     path::PathBuf,
@@ -108,12 +109,29 @@ fn exit_with_error(is_tty: bool, message: &str) -> ! {
 
 /// The main function for the Wordle game, implement your own logic here
 fn main() {
-    let args = Args::parse();
-
     let is_tty = atty::is(atty::Stream::Stdout);
 
+    let mut args = Args::parse();
+
+    // Config file specified
+    if let Some(path) = args.config {
+        // Load config file
+        if let Ok(mut defaults) = Args::load_defaults(&path) {
+            // Override config file with command line args
+            defaults.update_from(env::args());
+            args = defaults;
+        } else {
+            exit_with_error(is_tty, "Failed to load config file");
+        }
+    }
+
+    // Validate word list first because we need it for validating other arguments
+    if let Err(message) = args.validate_word_list() {
+        exit_with_error(is_tty, &message);
+    }
+
     // Current day
-    let mut day = args.day - 1;
+    let mut day = args.day.unwrap_or(args::DEFAULT_DAY) - 1;
 
     // Fetch acceptable words list
     let mut word_list: Vec<String> = if let Some(ref path) = args.acceptable_set {
@@ -130,7 +148,7 @@ fn main() {
 
     // Fetch final words list
     let answer_list = {
-        let mut list: Vec<String> = if let Some(path) = args.final_set {
+        let mut list: Vec<String> = if let Some(ref path) = args.final_set {
             read_word_list(&path)
         } else {
             // If final words list not provided but acceptable list provided,
@@ -154,24 +172,17 @@ fn main() {
 
         // When in random mode, shuffle the word list
         if args.random {
-            let mut rng = rand::rngs::StdRng::seed_from_u64(args.seed);
+            let mut rng =
+                rand::rngs::StdRng::seed_from_u64(args.seed.unwrap_or(args::DEFAULT_SEED));
             list.shuffle(&mut rng);
         }
         list
     };
 
     // Argument validation
-    if day > answer_list.len() as u32 {
-        exit_with_error(
-            is_tty,
-            "Day should be less than or equal to the number of answers!",
-        );
-    }
-    if let Some(ref word) = args.word {
-        if !answer_list.contains(&word) {
-            exit_with_error(is_tty, "Provided answer is not in the answer words list!");
-        }
-    }
+    if let Err(message) = args.validate(&answer_list) {
+        exit_with_error(is_tty, &message);
+    };
 
     // Initiate statistics
     let mut stats = if let Some(stats) = Stats::new(&args.state) {
@@ -251,7 +262,7 @@ fn main() {
             }
         } else {
             Game::new(
-                args.word.as_ref().unwrap(),
+                &args.word.as_ref().unwrap().to_lowercase(),
                 args.difficult,
                 &word_list,
                 &answer_list,
