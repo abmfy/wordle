@@ -48,9 +48,9 @@ pub struct Args {
     #[clap(short, long, value_parser = is_valid_word_list, value_name = "FILE")]
     pub acceptable_set: Option<PathBuf>,
 
-    /// Whether to save and load state
-    #[clap(short, long)]
-    pub state: bool,
+    /// Enable state saving and specify save file
+    #[clap(short = 'S', long, value_name = "FILE")]
+    pub state: Option<PathBuf>,
 }
 
 /// Check if a word list file is in valid format, and store the words

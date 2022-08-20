@@ -169,12 +169,19 @@ fn main() {
     }
     if let Some(ref word) = args.word {
         if !answer_list.contains(&word) {
-            exit_with_error(
-                is_tty,
-                "Provided answer is not in the answer words list!",
-            );
+            exit_with_error(is_tty, "Provided answer is not in the answer words list!");
         }
     }
+
+    // Initiate statistics
+    let mut stats = if let Some(stats) = Stats::new(&args.state) {
+        stats
+    } else {
+        exit_with_error(
+            is_tty,
+            "Failed to load stats: 'state.json' broken\nYou should consider delete it.",
+        );
+    };
 
     // Print welcome message
     if is_tty {
@@ -188,27 +195,24 @@ fn main() {
             console::style('e').bold().color256(93),
         );
 
-        print!(
-            "{}",
-            console::style("Could I have your name, please? ")
-                .bold()
-                .blue()
-        );
-        flush();
-        let line = if let Some(line) = read_line() {
-            line
-        } else {
-            exit_game(is_tty);
+        let name = {
+            print!(
+                "{}",
+                console::style("Could I have your name, please? ")
+                    .bold()
+                    .blue()
+            );
+            flush();
+            let line = if let Some(line) = read_line() {
+                line
+            } else {
+                exit_game(is_tty);
+            };
+            line.trim().to_string()
         };
-        println!("Welcome, {}!\n", line.trim());
-    }
 
-    // Initiate statistics
-    let mut stats = if let Some(stats) = Stats::new(args.state) {
-        stats
-    } else {
-        exit_with_error(is_tty, "Failed to load stats: 'state.json' should be in JSON format");
-    };
+        println!("Welcome, {}!\n", name);
+    }
 
     // Game loop
     loop {
@@ -291,7 +295,7 @@ fn main() {
                     // Handle win / fail
                     match game_status {
                         GameStatus::Won(round) => {
-                            stats.win(guesses);
+                            stats.win(args.state.is_some(), guesses);
                             break if is_tty {
                                 println!(
                                     "{}",
@@ -304,7 +308,7 @@ fn main() {
                             };
                         }
                         GameStatus::Failed(answer) => {
-                            stats.fail(guesses);
+                            stats.fail(args.state.is_some(), guesses, &answer);
                             break if is_tty {
                                 println!(
                                     "{}",

@@ -1,4 +1,9 @@
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use super::game::GuessStatus;
 
@@ -13,37 +18,109 @@ pub struct Stats {
     fails: i32,
     tries: i32,
     word_usage: Counter,
+    games: Vec<Game>,
+    state_path: Option<PathBuf>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct Game {
+    answer: String,
+    guesses: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct State {
+    total_rounds: Option<u32>,
+    games: Option<Vec<Game>>,
 }
 
 impl Stats {
-    /// Initialize statistics from scratch or JSON file
-    pub fn new(use_state: bool) -> Option<Self> {
-        if use_state {
-            None
-        } else {
-            Some(Self {
-                wins: 0,
-                fails: 0,
-                tries: 0,
-                word_usage: Counter::new(),
-            })
+    /// Return an initial state of stats
+    fn default() -> Self {
+        Self {
+            wins: 0,
+            fails: 0,
+            tries: 0,
+            word_usage: Counter::new(),
+            games: vec![],
+            state_path: None,
         }
     }
 
-    /// Won a game, update stats
-    pub fn win(&mut self, guesses: &Vec<(String, GuessStatus)>) {
-        self.wins += 1;
-        self.tries += guesses.len() as i32;
+    /// Initialize statistics from scratch or from JSON file.
+    /// Return None if 'state.json' is in invalid format
+    pub fn new(state_path: &Option<PathBuf>) -> Option<Self> {
+        let use_state = state_path.is_some();
+        // Use state and the JSON file exists
+        if use_state && PathBuf::from(state_path.as_ref().unwrap()).exists() {
+            if let Ok(state) = serde_json::from_str::<State>(
+                fs::read_to_string(state_path.as_ref().unwrap())
+                    .unwrap()
+                    .as_str(),
+            ) {
+                let mut stats = Self::default();
+                stats.state_path = state_path.clone();
+
+                // Load stats from file
+                if let Some(games) = state.games {
+                    for game in games {
+                        stats.games.push(game.clone());
+                        if game.guesses.last()? == &game.answer {
+                            stats.wins += 1;
+                            stats.tries += game.guesses.len() as i32;
+                        } else {
+                            stats.fails += 1;
+                        }
+                        for word in game.guesses {
+                            count(&mut stats.word_usage, word.to_lowercase());
+                        }
+                    }
+                }
+                Some(stats)
+            } else {
+                None
+            }
+        } else {
+            Some(Self::default())
+        }
+    }
+
+    pub fn save(&mut self) {
+        let state = State {
+            total_rounds: Some((self.wins + self.fails) as u32),
+            games: Some(self.games.clone()),
+        };
+        fs::write(self.state_path.as_ref().unwrap(), json!(state).to_string()).unwrap();
+    }
+
+    fn update_guesses(&mut self, guesses: &Vec<(String, GuessStatus)>, answer: &String) {
+        let mut words: Vec<String> = vec![];
         for (word, _) in guesses {
             count(&mut self.word_usage, word.to_string());
+            words.push(word.to_uppercase());
+        }
+        self.games.push(Game {
+            answer: answer.to_uppercase(),
+            guesses: words,
+        })
+    }
+
+    /// Won a game, update stats
+    pub fn win(&mut self, save: bool, guesses: &Vec<(String, GuessStatus)>) {
+        self.wins += 1;
+        self.tries += guesses.len() as i32;
+        self.update_guesses(guesses, &guesses.last().unwrap().0);
+        if save {
+            self.save();
         }
     }
 
     /// Failed a game, update stats
-    pub fn fail(&mut self, guesses: &Vec<(String, GuessStatus)>) {
+    pub fn fail(&mut self, save: bool, guesses: &Vec<(String, GuessStatus)>, answer: &String) {
         self.fails += 1;
-        for (word, _) in guesses {
-            count(&mut self.word_usage, word.to_string());
+        self.update_guesses(guesses, answer);
+        if save {
+            self.save();
         }
     }
 
