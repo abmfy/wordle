@@ -1,7 +1,7 @@
-use clap::{Parser, ArgGroup};
+use clap::Parser;
 use console;
-use rand::Rng;
-use std::{io::{self, Write}, collections::{HashSet, HashMap}};
+use rand::{SeedableRng, seq::SliceRandom};
+use std::{io::{self, Write}, collections::{HashMap}};
 
 mod builtin_words;
 mod game;
@@ -11,14 +11,13 @@ use game::{Game, LetterStatus, GuessStatus, GameStatus};
 /// Command line arguments
 #[derive(Parser, Debug)]
 #[clap(author="abmfy", about="A Wordle game, refined")]
-#[clap(group(ArgGroup::new("answer").args(&["word", "random"])))]
 struct Args {
     /// Specify the answer
     #[clap(short, long, value_parser=is_in_answer_list)]
     word: Option<String>,
 
     /// Randomly choose the answer
-    #[clap(short, long)]
+    #[clap(short, long, conflicts_with="word")]
     random: bool,
 
     /// Enter difficult mode, where you must guess according to the former result
@@ -27,7 +26,17 @@ struct Args {
 
     /// Show statistics
     #[clap(short='t', long)]
-    stats: bool
+    stats: bool,
+
+    /// Specify current day
+    #[clap(short, long, requires="random", conflicts_with="word", default_value_t=1,
+        value_parser=clap::value_parser!(u16).range(1..=builtin_words::FINAL.len() as i64))
+    ]
+    day: u16,
+
+    /// Specify random seed
+    #[clap(short, long, requires="random", conflicts_with="word", default_value_t=19260817)]
+    seed: u64
 }
 
 /// Counter for counting words usage
@@ -38,6 +47,7 @@ fn count(counter: &mut Counter, word: String) -> usize {
         .or_insert(1)
 }
 
+/// Check if a word is in the answer list
 fn is_in_answer_list(word: &str) -> Result<String, String> {
     if builtin_words::FINAL.binary_search(&word.to_lowercase().as_ref()).is_ok() {
         Ok(word.to_string())
@@ -133,8 +143,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Welcome, {}!\n", line.trim());
     }
 
-    // Avoid word recurrence when in random mode
-    let mut used_answers = HashSet::<usize>::new();
+    // Current day
+    let mut day = args.day - 1;
+    
+    let answer_list = {
+        let mut list: Vec<_> = builtin_words::FINAL.iter().cloned().collect();
+        // When in random mode, shuffle the word list
+        if args.random {
+            let mut rng = rand::rngs::StdRng::seed_from_u64(args.seed);
+            list.shuffle(&mut rng);
+        }
+        list
+    };
 
     // Statistics
     let mut wins = 0;
@@ -148,17 +168,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut game = if args.word.is_none() {
             // Random mode
             if args.random {
-                let index = loop {
-                    let now = rand::thread_rng().gen_range(0..builtin_words::FINAL.len());
-                    if !used_answers.contains(&now) {
-                        used_answers.insert(now);
-                        break now
-                    } else {
-                        continue
-                    }
-                };
-
-                Game::new(builtin_words::FINAL[index], args.difficult).unwrap()
+                Game::new(answer_list[day as usize], args.difficult).unwrap()
             } else {
                 if is_tty {
                     print!("{}", console::style("Please choose an answer for the game: ").bold().blue());
@@ -180,6 +190,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             Game::new(args.word.as_ref().unwrap(), args.difficult).unwrap()
         };
+
+        // Another day of playing wordle...
+        day += 1;
 
         loop {
             if is_tty {
