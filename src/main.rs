@@ -2,68 +2,23 @@ use clap::Parser;
 use console;
 use rand::{seq::SliceRandom, SeedableRng};
 use std::{
-    collections::HashMap,
-    io::{self, Write},
+    collections::{HashMap, HashSet},
+    fs::File,
+    io::{self, Read, Write},
+    path::PathBuf,
+    process::exit,
 };
 
+mod args;
 mod builtin_words;
 mod game;
 
 use game::{Game, GameStatus, GuessStatus, LetterStatus};
 
-/// Command line arguments
-#[derive(Parser, Debug)]
-#[clap(author = "abmfy", about = "A Wordle game, refined")]
-struct Args {
-    /// Specify the answer
-    #[clap(short, long, value_parser=is_in_answer_list)]
-    word: Option<String>,
-
-    /// Randomly choose the answer
-    #[clap(short, long, conflicts_with = "word")]
-    random: bool,
-
-    /// Enter difficult mode, where you must guess according to the former result
-    #[clap(short = 'D', long)]
-    difficult: bool,
-
-    /// Show statistics
-    #[clap(short = 't', long)]
-    stats: bool,
-
-    /// Specify current day
-    #[clap(short, long, requires="random", conflicts_with="word", default_value_t=1,
-        value_parser=clap::value_parser!(u16).range(1..=builtin_words::FINAL.len() as i64))
-    ]
-    day: u16,
-
-    /// Specify random seed
-    #[clap(
-        short,
-        long,
-        requires = "random",
-        conflicts_with = "word",
-        default_value_t = 19260817
-    )]
-    seed: u64,
-}
-
 /// Counter for counting words usage
 type Counter = HashMap<String, usize>;
 fn count(counter: &mut Counter, word: String) -> usize {
     *counter.entry(word).and_modify(|cnt| *cnt += 1).or_insert(1)
-}
-
-/// Check if a word is in the answer list
-fn is_in_answer_list(word: &str) -> Result<String, String> {
-    if builtin_words::FINAL
-        .binary_search(&word.to_lowercase().as_ref())
-        .is_ok()
-    {
-        Ok(word.to_string())
-    } else {
-        Err(game::Error::BadAnswer.what())
-    }
 }
 
 /// Read a line, trimmed. Return None if EOF encountered
@@ -73,6 +28,17 @@ fn read_line() -> Option<String> {
         Ok(0) | Err(_) => None,
         Ok(_) => Some(line.trim().to_string()),
     }
+}
+
+/// Read a word list from a file
+fn read_word_list(path: &PathBuf) -> Vec<String> {
+    let mut file = File::open(path).unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).unwrap();
+    contents
+        .split_whitespace()
+        .map(|s| s.to_lowercase())
+        .collect()
 }
 
 /// Flush the output
@@ -128,19 +94,68 @@ fn print_alphabet(alphabet: &[LetterStatus]) {
 }
 
 /// Exit game and provided a message if in tty mode
-fn exit_game(is_tty: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn exit_game(is_tty: bool) -> ! {
     if is_tty {
         println!("{}", console::style("Goodbye!").bold().green());
     }
-    Ok(())
+    exit(0);
 }
 
 /// The main function for the Wordle game, implement your own logic here
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
+fn main() {
+    let args = args::Args::parse();
 
     let is_tty = atty::is(atty::Stream::Stdout);
 
+    // Current day
+    let mut day = args.day - 1;
+
+    // Fetch acceptable words list
+    let word_list: Vec<String> = if let Some(ref path) = args.acceptable_file {
+        read_word_list(&path)
+    } else {
+        builtin_words::ACCEPTABLE
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
+    };
+
+    // Fetch final words list
+    let answer_list = {
+        let mut list: Vec<String> = if let Some(path) = args.final_file {
+            read_word_list(&path)
+        } else {
+            // If final words list not provided but acceptable list provided,
+            // use the acceptable list as final words list
+            if let Some(_) = args.acceptable_file {
+                word_list.clone()
+            } else {
+                builtin_words::FINAL.iter().map(|s| s.to_string()).collect()
+            }
+        };
+
+        // Ensure the final words are a subset of acceptable words
+        let final_set: HashSet<_> = list.iter().cloned().collect();
+        let acceptable_set: HashSet<_> = word_list.iter().cloned().collect();
+        if !final_set.is_subset(&acceptable_set) {
+            println!(
+                "{}",
+                console::style("Final words should be a subset of acceptable words!")
+                    .bold()
+                    .red()
+            );
+            exit(1);
+        }
+
+        // When in random mode, shuffle the word list
+        if args.random {
+            let mut rng = rand::rngs::StdRng::seed_from_u64(args.seed);
+            list.shuffle(&mut rng);
+        }
+        list
+    };
+
+    // Print welcome message
     if is_tty {
         println!(
             "Welcome to {}{}{}{}{}{}!\n",
@@ -159,23 +174,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .blue()
         );
         flush();
-        let mut line = String::new();
-        io::stdin().read_line(&mut line)?;
+        let line = if let Some(line) = read_line() {
+            line
+        } else {
+            exit_game(is_tty);
+        };
         println!("Welcome, {}!\n", line.trim());
     }
-
-    // Current day
-    let mut day = args.day - 1;
-
-    let answer_list = {
-        let mut list: Vec<_> = builtin_words::FINAL.iter().cloned().collect();
-        // When in random mode, shuffle the word list
-        if args.random {
-            let mut rng = rand::rngs::StdRng::seed_from_u64(args.seed);
-            list.shuffle(&mut rng);
-        }
-        list
-    };
 
     // Statistics
     let mut wins = 0;
@@ -189,7 +194,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut game = if args.word.is_none() {
             // Random mode
             if args.random {
-                Game::new(answer_list[day as usize], args.difficult).unwrap()
+                Game::new(
+                    &answer_list[day as usize],
+                    args.difficult,
+                    &word_list,
+                    &answer_list,
+                )
+                .unwrap()
             } else {
                 if is_tty {
                     print!(
@@ -203,21 +214,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 loop {
                     let answer: String = match read_line() {
                         Some(word) => word,
-                        None => return exit_game(is_tty),
+                        None => exit_game(is_tty),
                     };
                     let answer = answer.to_lowercase();
-                    match Game::new(&answer, args.difficult) {
+                    match Game::new(&answer, args.difficult, &word_list, &answer_list) {
                         Ok(game) => break game,
                         Err(error) => print_error(is_tty, &error),
                     }
                 }
             }
         } else {
-            Game::new(args.word.as_ref().unwrap(), args.difficult).unwrap()
+            Game::new(
+                args.word.as_ref().unwrap(),
+                args.difficult,
+                &word_list,
+                &answer_list,
+            )
+            .unwrap()
         };
 
         // Another day of playing wordle...
+        // The mod is here to avoid overflow
         day += 1;
+        day %= answer_list.len() as u16;
 
         loop {
             if is_tty {
@@ -230,7 +249,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let word: String = match read_line() {
                 Some(word) => word,
-                None => return exit_game(is_tty),
+                None => exit_game(is_tty),
             };
             let word = word.to_lowercase();
             let result = game.guess(&word);
@@ -352,13 +371,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("");
 
                 match read_line() {
-                    None => return exit_game(is_tty),
+                    None => exit_game(is_tty),
                     Some(line) => {
                         if line == "Y" {
                             // Continue game loop
                             continue;
                         } else {
-                            return exit_game(is_tty);
+                            exit_game(is_tty);
                         }
                     }
                 }
@@ -374,16 +393,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
                 flush();
                 match read_line() {
-                    None => return exit_game(is_tty),
+                    None => exit_game(is_tty),
                     Some(line) => match line.as_str() {
                         "Y" | "y" => break println!(""),
-                        "N" | "n" => return exit_game(is_tty),
+                        "N" | "n" => exit_game(is_tty),
                         _ => continue,
                     },
                 }
             }
         } else {
-            return exit_game(is_tty);
+            exit_game(is_tty);
         }
     }
 }

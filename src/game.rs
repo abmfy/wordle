@@ -3,9 +3,6 @@ use std::collections::HashMap;
 use console::Color;
 use console::StyledObject;
 
-use super::builtin_words::ACCEPTABLE as WORD_LIST;
-use super::builtin_words::FINAL as ANSWER_LIST;
-
 const ALPHABET_SIZE: usize = 26;
 const WORD_LENGTH: usize = 5;
 const MAX_GAME_ROUND: usize = 6;
@@ -76,18 +73,24 @@ pub enum GameStatus {
     Failed(String),
 }
 
-pub struct Game {
+pub struct Game<'a> {
     answer: String,
     guesses: Vec<(String, GuessStatus)>,
     alphabet: Alphabet,
     difficult: bool,
+    word_list: &'a Vec<String>,
 }
 
-impl Game {
+impl<'a> Game<'a> {
     /// Start a new game with given answer
-    pub fn new(answer: &str, difficult: bool) -> Result<Self, Error> {
+    pub fn new(
+        answer: &str,
+        difficult: bool,
+        word_list: &'a Vec<String>,
+        answer_list: &'a Vec<String>,
+    ) -> Result<Self, Error> {
         // Provided answer not in good answer list
-        if ANSWER_LIST.binary_search(&answer).is_err() {
+        if !answer_list.contains(&answer.to_string()) {
             return Err(Error::BadAnswer);
         }
         Ok(Self {
@@ -95,6 +98,7 @@ impl Game {
             guesses: vec![],
             alphabet: [LetterStatus::Unknown; ALPHABET_SIZE],
             difficult,
+            word_list,
         })
     }
 
@@ -200,7 +204,7 @@ impl Game {
             return Err(Error::UnexpectedWordLength);
         }
         // Word not in acceptable word list
-        if WORD_LIST.binary_search(&word).is_err() {
+        if !self.word_list.contains(&word.to_string()) {
             return Err(Error::UnknownWord);
         }
 
