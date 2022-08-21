@@ -51,34 +51,42 @@ impl Stats {
     /// Return None if 'state.json' is in invalid format
     pub fn new(state_path: &Option<PathBuf>) -> Option<Self> {
         let use_state = state_path.is_some();
-        // Use state and the JSON file exists
-        if use_state && PathBuf::from(state_path.as_ref().unwrap()).exists() {
-            if let Ok(state) = serde_json::from_str::<State>(
-                fs::read_to_string(state_path.as_ref().unwrap())
-                    .unwrap()
-                    .as_str(),
-            ) {
-                let mut stats = Self::default();
-                stats.state_path = state_path.clone();
+        // Use state mode
+        if use_state {
+            // If the state file exists, read it
+            if PathBuf::from(state_path.as_ref().unwrap()).exists() {
+                if let Ok(state) = serde_json::from_str::<State>(
+                    fs::read_to_string(state_path.as_ref().unwrap())
+                        .unwrap()
+                        .as_str(),
+                ) {
+                    let mut stats = Self::default();
+                    stats.state_path = state_path.clone();
 
-                // Load stats from file
-                if let Some(games) = state.games {
-                    for game in games {
-                        stats.games.push(game.clone());
-                        if game.guesses.last()? == &game.answer {
-                            stats.wins += 1;
-                            stats.tries += game.guesses.len() as i32;
-                        } else {
-                            stats.fails += 1;
-                        }
-                        for word in game.guesses {
-                            count(&mut stats.word_usage, word.to_lowercase());
+                    // Load stats from file
+                    if let Some(games) = state.games {
+                        for game in games {
+                            stats.games.push(game.clone());
+                            if game.guesses.last()? == &game.answer {
+                                stats.wins += 1;
+                                stats.tries += game.guesses.len() as i32;
+                            } else {
+                                stats.fails += 1;
+                            }
+                            for word in game.guesses {
+                                count(&mut stats.word_usage, word.to_lowercase());
+                            }
                         }
                     }
+                    Some(stats)
+                } else {
+                    None
                 }
-                Some(stats)
             } else {
-                None
+                // Create new state file
+                let mut stats = Self::default();
+                stats.state_path = state_path.clone();
+                Some(stats)
             }
         } else {
             Some(Self::default())
