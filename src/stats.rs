@@ -28,8 +28,8 @@ struct Game {
     guesses: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize)]
-struct State {
+#[derive(Default, Serialize, Deserialize)]
+pub struct State {
     total_rounds: Option<u32>,
     games: Option<Vec<Game>>,
 }

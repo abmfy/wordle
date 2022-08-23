@@ -23,7 +23,7 @@ fn get_default_seed() -> Option<u64> {
 }
 
 /// Command line arguments
-#[derive(Parser, Debug, Serialize, Deserialize)]
+#[derive(Parser, Debug, Serialize, Deserialize, Default)]
 #[clap(author = "abmfy", about = "A Wordle game, refined")]
 pub struct Args {
     /// Specify the answer
@@ -72,6 +72,11 @@ pub struct Args {
     /// Specify default parameters from a JSON file
     #[clap(short, long, value_name = "FILE")]
     pub config: Option<PathBuf>,
+
+    /// GUI mode
+    #[clap(short, long)]
+    #[serde(default)]
+    pub gui: bool,
 }
 
 impl Args {

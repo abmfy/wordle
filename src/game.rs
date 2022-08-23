@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use console::Color;
 use console::StyledObject;
+use serde::Deserialize;
+use serde::Serialize;
 
 const ALPHABET_SIZE: usize = 26;
 const WORD_LENGTH: usize = 5;
@@ -29,7 +31,7 @@ impl Error {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum LetterStatus {
     Unknown,
     Red,
@@ -67,28 +69,24 @@ pub fn get_index(c: char) -> usize {
     c as usize - 'a' as usize
 }
 
+#[derive(PartialEq, Eq, Serialize, Deserialize)]
 pub enum GameStatus {
     Going,
     Won(usize),
     Failed(String),
 }
 
-pub struct Game<'a> {
+#[derive(Serialize, Deserialize)]
+pub struct Game {
     answer: String,
     guesses: Vec<(String, GuessStatus)>,
     alphabet: Alphabet,
     difficult: bool,
-    word_list: &'a Vec<String>,
 }
 
-impl<'a> Game<'a> {
+impl Game {
     /// Start a new game with given answer
-    pub fn new(
-        answer: &str,
-        difficult: bool,
-        word_list: &'a Vec<String>,
-        answer_list: &'a Vec<String>,
-    ) -> Result<Self, Error> {
+    pub fn new(answer: &str, difficult: bool, answer_list: &Vec<String>) -> Result<Self, Error> {
         // Provided answer not in good answer list
         if !answer_list.contains(&answer.to_string()) {
             return Err(Error::BadAnswer);
@@ -98,13 +96,22 @@ impl<'a> Game<'a> {
             guesses: vec![],
             alphabet: [LetterStatus::Unknown; ALPHABET_SIZE],
             difficult,
-            word_list,
         })
     }
 
     /// How many rounds has this game gone through
     pub fn get_round(&self) -> usize {
         self.guesses.len()
+    }
+
+    // Getter for guesses
+    pub fn get_guesses(&self) -> &Vec<(String, GuessStatus)> {
+        &self.guesses
+    }
+
+    // Getter for alphabet
+    pub fn get_alphabet(&self) -> &Alphabet {
+        &&self.alphabet
     }
 
     /// Get the status of a guess
@@ -196,15 +203,12 @@ impl<'a> Game<'a> {
     }
 
     /// Make a guess
-    pub fn guess(
-        &mut self,
-        word: &str,
-    ) -> Result<(GameStatus, &Vec<(String, GuessStatus)>, &Alphabet), Error> {
+    pub fn guess(&mut self, word: &str, word_list: &Vec<String>) -> Result<GameStatus, Error> {
         if word.len() != WORD_LENGTH {
             return Err(Error::UnexpectedWordLength);
         }
         // Word not in acceptable word list
-        if self.word_list.binary_search(&word.to_string()).is_err() {
+        if word_list.binary_search(&word.to_string()).is_err() {
             return Err(Error::UnknownWord);
         }
 
@@ -223,6 +227,6 @@ impl<'a> Game<'a> {
             GameStatus::Going
         };
 
-        Ok((game_status, &self.guesses, &self.alphabet))
+        Ok(game_status)
     }
 }

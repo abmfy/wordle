@@ -10,11 +10,13 @@ use std::{
     process,
 };
 
+mod app;
 mod args;
 mod builtin_words;
 mod game;
 mod stats;
 
+use app::WordleApp;
 use args::Args;
 use game::{Error, Game, GameStatus, GuessStatus, LetterStatus};
 use stats::Stats;
@@ -107,11 +109,22 @@ fn exit_with_error(is_tty: bool, message: &str) -> ! {
     process::exit(1);
 }
 
-/// The main function for the Wordle game, implement your own logic here
+/// The main function for the Wordle game, for native run
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
     let is_tty = atty::is(atty::Stream::Stdout);
 
     let mut args = Args::parse();
+
+    // Start GUI
+    if args.gui {
+        eframe::run_native(
+            "Wordle",
+            eframe::NativeOptions::default(),
+            Box::new(|cc| Box::new(WordleApp::new(cc))),
+        );
+        return;
+    }
 
     // Config file specified
     if let Some(path) = args.config {
@@ -231,13 +244,7 @@ fn main() {
         let mut game = if args.word.is_none() {
             // Random mode
             if args.random {
-                Game::new(
-                    &answer_list[day as usize],
-                    args.difficult,
-                    &word_list,
-                    &answer_list,
-                )
-                .unwrap()
+                Game::new(&answer_list[day as usize], args.difficult, &answer_list).unwrap()
             } else {
                 if is_tty {
                     print!(
@@ -254,7 +261,7 @@ fn main() {
                         None => exit_game(is_tty),
                     };
                     let answer = answer.to_lowercase();
-                    match Game::new(&answer, args.difficult, &word_list, &answer_list) {
+                    match Game::new(&answer, args.difficult, &answer_list) {
                         Ok(game) => break game,
                         Err(error) => print_error(is_tty, &error),
                     }
@@ -264,7 +271,6 @@ fn main() {
             Game::new(
                 &args.word.as_ref().unwrap().to_lowercase(),
                 args.difficult,
-                &word_list,
                 &answer_list,
             )
             .unwrap()
@@ -289,9 +295,11 @@ fn main() {
                 None => exit_game(is_tty),
             };
             let word = word.to_lowercase();
-            let result = game.guess(&word);
+            let result = game.guess(&word, &word_list);
             match result {
-                Ok((game_status, guesses, alphabet)) => {
+                Ok(game_status) => {
+                    let guesses = game.get_guesses();
+                    let alphabet = game.get_alphabet();
                     // Print game status
                     if is_tty {
                         print_guess_history(guesses);
@@ -379,4 +387,15 @@ fn main() {
             exit_game(is_tty);
         }
     }
+}
+
+// For compiling into Wasm
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    eframe::start_web(
+        "canvas",
+        eframe::WebOptions::default(),
+        Box::new(|cc| Box::new(WordleApp::new(cc))),
+    )
+    .unwrap();
 }
