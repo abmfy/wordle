@@ -3,6 +3,7 @@ use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
 mod colors;
+mod grid;
 mod keyboard;
 mod letter;
 mod metrics;
@@ -11,13 +12,11 @@ mod visuals;
 
 use crate::args::{self, Args};
 use crate::builtin_words;
-use crate::game::{Game, GameStatus, LetterStatus};
+use crate::game::{Game, GameStatus};
 use crate::stats::State;
 
-use letter::Letter;
-
+use grid::grid;
 use keyboard::keyboard;
-use letter::letter;
 
 /// App state persistence
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -108,6 +107,26 @@ impl WordleApp {
 
         app
     }
+
+    /// Start a new game
+    fn start(&mut self) {
+        let mut day = self.args.day.unwrap_or(0);
+
+        self.game = Game::new(
+            &self.answer_list[day as usize],
+            self.args.difficult,
+            &self.answer_list,
+        )
+        .ok();
+
+        // Yet another day of playing wordle...
+        // The mod is here to avoid overflow
+        day += 1;
+        day %= self.answer_list.len() as u32;
+        self.args.day = Some(day);
+
+        self.game_status = Some(GameStatus::Going);
+    }
 }
 
 impl eframe::App for WordleApp {
@@ -163,73 +182,14 @@ impl eframe::App for WordleApp {
 
             // Start a new game
             if self.game.is_none() {
-                let mut day = self.args.day.unwrap_or(0);
-
-                self.game = Game::new(
-                    &self.answer_list[day as usize],
-                    self.args.difficult,
-                    &self.answer_list,
-                )
-                .ok();
-
-                // Yet another day of playing wordle...
-                // The mod is here to avoid overflow
-                day += 1;
-                day %= self.answer_list.len() as u32;
-                self.args.day = Some(day);
-
-                self.game_status = Some(GameStatus::Going);
+                self.start();
             }
 
             // We are in a game now
             let game = self.game.as_mut().unwrap();
 
             // The letter grid
-            for i in 0..metrics::ROWS as usize {
-                for j in 0..metrics::COLUMNS as usize {
-                    // Already guessed
-                    if i < game.get_round() {
-                        let guess = &game.get_guesses()[i];
-                        let letter_char =
-                            Some(guess.0.chars().nth(j).unwrap().to_ascii_uppercase());
-                        let status = guess.1[j];
-                        letter(
-                            ui,
-                            self.args.difficult,
-                            i as i32,
-                            j as i32,
-                            &Letter {
-                                letter: letter_char,
-                                status,
-                            },
-                        );
-                    } else if i == game.get_round() && j < self.guess.len() {
-                        // We'll input words in this row, and the jth letter already input
-                        letter(
-                            ui,
-                            self.args.difficult,
-                            i as i32,
-                            j as i32,
-                            &Letter {
-                                letter: self.guess.chars().nth(j),
-                                status: LetterStatus::Unknown,
-                            },
-                        )
-                    } else {
-                        // Blank letter
-                        letter(
-                            ui,
-                            self.args.difficult,
-                            i as i32,
-                            j as i32,
-                            &Letter {
-                                letter: None,
-                                status: LetterStatus::Unknown,
-                            },
-                        );
-                    }
-                }
-            }
+            grid(ui, game, &mut self.guess, self.args.difficult);
 
             // Render the keyboard and get keyboard input
             if let Some(key) = keyboard(
