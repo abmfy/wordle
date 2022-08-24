@@ -7,22 +7,24 @@ mod grid;
 mod keyboard;
 mod letter;
 mod metrics;
+mod stats;
 mod utils;
 mod visuals;
 
 use crate::args::{self, Args};
 use crate::builtin_words;
 use crate::game::{Game, GameStatus};
-use crate::stats::State;
+use crate::stats::Stats;
 
 use grid::grid;
 use keyboard::keyboard;
+use stats::stats;
 
 /// App state persistence
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct WordleApp {
     args: Args,
-    state: State,
+    stats: Stats,
     game: Option<Game>,
     game_status: Option<GameStatus>,
     guess: String,
@@ -36,7 +38,7 @@ impl Default for WordleApp {
     fn default() -> Self {
         Self {
             args: Args::default(),
-            state: State::default(),
+            stats: Stats::default(),
             game: None,
             game_status: None,
             guess: "".to_string(),
@@ -71,15 +73,15 @@ impl WordleApp {
             .insert(FontFamily::Name("SF".into()), vec!["SF".to_string()]);
 
         fonts.font_data.insert(
-            "SF_R".to_string(),
-            FontData::from_static(include_bytes!("../assets/SF-Pro-Display-Regular.otf")),
+            "SFM".to_string(),
+            FontData::from_static(include_bytes!("../assets/SF-Mono-Medium.otf")),
         );
 
         fonts
             .families
             .get_mut(&FontFamily::Proportional)
             .unwrap()
-            .insert(0, "SF_R".to_string());
+            .insert(0, "SFM".to_string());
 
         cc.egui_ctx.set_fonts(fonts);
 
@@ -154,7 +156,7 @@ impl eframe::App for WordleApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // Setting panel
             Frame::window(ui.style()).show(ui, |ui| {
-                CollapsingHeader::new("Settings").show(ui, |ui| {
+                CollapsingHeader::new("Settings  ").show(ui, |ui| {
                     ui.set_max_width(200.0);
                     // TODO: unimplemented
                     // ui.add(Label::new("The settings will go into effect next game.").wrap(true));
@@ -171,14 +173,8 @@ impl eframe::App for WordleApp {
                 });
             });
 
-            // Statistics panel
-            Frame::window(ui.style()).show(ui, |ui| {
-                CollapsingHeader::new("Statistics").show(ui, |ui| {
-                    // TODO: unimplemented
-                    ui.set_max_width(200.0);
-                    ui.label("How about we explore the area ahead of us later?");
-                });
-            });
+            // Stats panel
+            stats(ui, self.args.difficult, &self.stats);
 
             // Start a new game
             if self.game.is_none() {
@@ -206,6 +202,18 @@ impl eframe::App for WordleApp {
                             let result = game.guess(&self.guess, &self.word_list);
                             match result {
                                 Ok(game_status) => {
+                                    // Update stats
+                                    self.stats.update_guess(&self.guess);
+                                    match &game_status {
+                                        GameStatus::Won(round) => {
+                                            self.stats.win_with_guesses_updated(*round)
+                                        }
+                                        GameStatus::Failed(_) => {
+                                            self.stats.fail_with_guesses_updated()
+                                        }
+                                        GameStatus::Going => (),
+                                    }
+
                                     // Clear guess for next guess to use
                                     self.guess.clear();
 

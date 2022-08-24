@@ -13,6 +13,7 @@ fn count(counter: &mut Counter, word: String) -> usize {
     *counter.entry(word).and_modify(|cnt| *cnt += 1).or_insert(1)
 }
 
+#[derive(Default, Serialize, Deserialize)]
 pub struct Stats {
     wins: i32,
     fails: i32,
@@ -93,6 +94,39 @@ impl Stats {
         }
     }
 
+    /// Getter for wins
+    pub fn get_wins(&self) -> i32 {
+        self.wins
+    }
+
+    /// Getter for fails
+    pub fn get_fails(&self) -> i32 {
+        self.fails
+    }
+
+    /// Get average tries of game won
+    pub fn get_average_tries(&self) -> f64 {
+        if self.wins == 0 {
+            0.0
+        } else {
+            self.tries as f64 / self.wins as f64
+        }
+    }
+
+    /// Get favorite five words
+    pub fn get_favorite_words(&self) -> Vec<(&String, &usize)> {
+        // Sort used words by usage times
+        let mut words: Vec<(&String, &usize)> = self.word_usage.iter().collect();
+        words.sort_by(|(word1, cnt1), (word2, cnt2)| {
+            if cnt1 != cnt2 {
+                return cnt1.cmp(cnt2);
+            }
+            return word1.cmp(word2).reverse();
+        });
+        words.iter().cloned().rev().take(5).collect()
+    }
+
+    /// Save stats to specified path
     pub fn save(&mut self) {
         let state = State {
             total_rounds: Some((self.wins + self.fails) as u32),
@@ -101,10 +135,16 @@ impl Stats {
         fs::write(self.state_path.as_ref().unwrap(), json!(state).to_string()).unwrap();
     }
 
+    /// Update the stats of a single guess
+    pub fn update_guess(&mut self, guess: &str) {
+        count(&mut self.word_usage, guess.to_string());
+    }
+
+    /// Update stats of the guesses
     fn update_guesses(&mut self, guesses: &Vec<(String, GuessStatus)>, answer: &String) {
         let mut words: Vec<String> = vec![];
         for (word, _) in guesses {
-            count(&mut self.word_usage, word.to_string());
+            self.update_guess(word);
             words.push(word.to_string());
         }
         self.games.push(Game {
@@ -113,14 +153,28 @@ impl Stats {
         })
     }
 
+    /// Won a game with given round, update stats
+    /// This function is here for GUI. In GUI mode we update guess stats every guess,
+    /// so we don't need to update guess stats again when game is over
+    pub fn win_with_guesses_updated(&mut self, round: usize) {
+        self.wins += 1;
+        self.tries += round as i32;
+    }
+
     /// Won a game, update stats
     pub fn win(&mut self, save: bool, guesses: &Vec<(String, GuessStatus)>) {
-        self.wins += 1;
-        self.tries += guesses.len() as i32;
+        self.win_with_guesses_updated(guesses.len());
         self.update_guesses(guesses, &guesses.last().unwrap().0);
         if save {
             self.save();
         }
+    }
+
+    /// Failed a game, update stats
+    /// This function is here for GUI. In GUI mode we update guess stats every guess,
+    /// so we don't need to update guess stats again when game is over
+    pub fn fail_with_guesses_updated(&mut self) {
+        self.fails += 1;
     }
 
     /// Failed a game, update stats
@@ -134,20 +188,10 @@ impl Stats {
 
     /// Print statistics in tty mode
     pub fn print(&self, is_tty: bool) {
-        let average_tries = if self.wins == 0 {
-            0.0
-        } else {
-            self.tries as f64 / self.wins as f64
-        };
+        let average_tries = self.get_average_tries();
 
         // Sort used words by usage times
-        let mut vec: Vec<(&String, &usize)> = self.word_usage.iter().collect();
-        vec.sort_by(|(word1, cnt1), (word2, cnt2)| {
-            if cnt1 != cnt2 {
-                return cnt1.cmp(cnt2);
-            }
-            return word1.cmp(word2).reverse();
-        });
+        let words = self.get_favorite_words();
 
         if is_tty {
             println!("{}", console::style("Statistics:").bold().yellow());
@@ -166,7 +210,7 @@ impl Stats {
                 "{}",
                 console::style("Most frequently used words:").bold().blue()
             );
-            for (word, count) in vec.iter().rev().take(5) {
+            for (word, count) in words {
                 println!(
                     "    {}: used {count} times ",
                     console::style(word).bold().magenta()
@@ -176,7 +220,7 @@ impl Stats {
             println!("{} {} {average_tries:.2}", self.wins, self.fails);
 
             let mut first = true;
-            for (word, count) in vec.iter().rev().take(5) {
+            for (word, count) in words {
                 if !first {
                     print!(" ");
                 }
