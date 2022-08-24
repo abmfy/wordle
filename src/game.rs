@@ -66,7 +66,7 @@ pub type Alphabet = [LetterStatus; ALPHABET_SIZE];
 
 // Get the index of a letter in an alphabet
 pub fn get_index(c: char) -> usize {
-    c as usize - 'a' as usize
+    c as usize - 'A' as usize
 }
 
 #[derive(PartialEq, Eq, Serialize, Deserialize)]

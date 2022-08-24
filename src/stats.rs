@@ -74,7 +74,7 @@ impl Stats {
                                 stats.fails += 1;
                             }
                             for word in game.guesses {
-                                count(&mut stats.word_usage, word.to_lowercase());
+                                count(&mut stats.word_usage, word);
                             }
                         }
                     }
@@ -105,10 +105,10 @@ impl Stats {
         let mut words: Vec<String> = vec![];
         for (word, _) in guesses {
             count(&mut self.word_usage, word.to_string());
-            words.push(word.to_uppercase());
+            words.push(word.to_string());
         }
         self.games.push(Game {
-            answer: answer.to_uppercase(),
+            answer: answer.to_string(),
             guesses: words,
         })
     }
@@ -169,7 +169,7 @@ impl Stats {
             for (word, count) in vec.iter().rev().take(5) {
                 println!(
                     "    {}: used {count} times ",
-                    console::style(word.to_uppercase()).bold().magenta()
+                    console::style(word).bold().magenta()
                 );
             }
         } else {
@@ -181,7 +181,7 @@ impl Stats {
                     print!(" ");
                 }
                 first = false;
-                print!("{} {count}", word.to_uppercase());
+                print!("{word} {count}");
             }
             println!("");
         }

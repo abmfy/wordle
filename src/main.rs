@@ -37,7 +37,7 @@ fn read_word_list(path: &PathBuf) -> Vec<String> {
     file.read_to_string(&mut contents).unwrap();
     contents
         .split_whitespace()
-        .map(|s| s.to_lowercase())
+        .map(|s| s.to_uppercase())
         .collect()
 }
 
@@ -65,10 +65,7 @@ fn print_guess_history(guesses: &Vec<(String, GuessStatus)>) {
     for i in 0..6 {
         if i < guesses.len() {
             for (j, c) in guesses[i].0.chars().enumerate() {
-                print!(
-                    "{}",
-                    guesses[i].1[j].colored_char(c.to_uppercase().nth(0).unwrap())
-                );
+                print!("{}", guesses[i].1[j].colored_char(c));
             }
             println!("");
         } else {
@@ -77,17 +74,14 @@ fn print_guess_history(guesses: &Vec<(String, GuessStatus)>) {
     }
 }
 
-// Print the alphabet, in tty mode
+/// Print the alphabet, in tty mode
 fn print_alphabet(alphabet: &[LetterStatus]) {
-    const ROW1: &str = "qwertyuiop";
-    const ROW2: &str = "asdfghjkl";
-    const ROW3: &str = "zxcvbnm";
+    const ROW1: &str = "QWERTYUIOP";
+    const ROW2: &str = "ASDFGHJKL";
+    const ROW3: &str = "ZXCVBNM";
     for row in [ROW1, ROW2, ROW3] {
         for c in row.chars() {
-            print!(
-                "{}",
-                alphabet[game::get_index(c)].colored_char(c.to_uppercase().nth(0).unwrap())
-            );
+            print!("{}", alphabet[game::get_index(c)].colored_char(c));
         }
         println!("");
     }
@@ -152,7 +146,7 @@ fn main() {
     } else {
         builtin_words::ACCEPTABLE
             .iter()
-            .map(|s| s.to_string())
+            .map(|s| s.to_uppercase())
             .collect()
     };
 
@@ -169,7 +163,10 @@ fn main() {
             if let Some(_) = args.acceptable_set {
                 word_list.clone()
             } else {
-                builtin_words::FINAL.iter().map(|s| s.to_string()).collect()
+                builtin_words::FINAL
+                    .iter()
+                    .map(|s| s.to_uppercase())
+                    .collect()
             }
         };
 
@@ -260,7 +257,7 @@ fn main() {
                         Some(word) => word,
                         None => exit_game(is_tty),
                     };
-                    let answer = answer.to_lowercase();
+                    let answer = answer.to_uppercase();
                     match Game::new(&answer, args.difficult, &answer_list) {
                         Ok(game) => break game,
                         Err(error) => print_error(is_tty, &error),
@@ -269,7 +266,7 @@ fn main() {
             }
         } else {
             Game::new(
-                &args.word.as_ref().unwrap().to_lowercase(),
+                &args.word.as_ref().unwrap().to_uppercase(),
                 args.difficult,
                 &answer_list,
             )
@@ -294,7 +291,7 @@ fn main() {
                 Some(word) => word,
                 None => exit_game(is_tty),
             };
-            let word = word.to_lowercase();
+            let word = word.to_uppercase();
             let result = game.guess(&word, &word_list);
             match result {
                 Ok(game_status) => {
@@ -331,15 +328,12 @@ fn main() {
                             break if is_tty {
                                 println!(
                                     "{}",
-                                    console::style(format!(
-                                        "You lose! The answer is: {}",
-                                        answer.to_uppercase()
-                                    ))
-                                    .bold()
-                                    .red()
+                                    console::style(format!("You lose! The answer is: {}", answer))
+                                        .bold()
+                                        .red()
                                 )
                             } else {
-                                println!("FAILED {}", answer.to_uppercase())
+                                println!("FAILED {}", answer)
                             };
                         }
                         GameStatus::Going => (),

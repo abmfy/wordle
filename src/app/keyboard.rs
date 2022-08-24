@@ -262,9 +262,9 @@ fn enter_key(
         rect.center(),
         Align2::CENTER_CENTER,
         match status {
-            GameStatus::Going => "ENTER".to_string(),
-            GameStatus::Won(_) => "Bravo!".to_string(),
-            GameStatus::Failed(answer) => answer.to_uppercase(),
+            GameStatus::Going => "ENTER",
+            GameStatus::Won(_) => "Bravo!",
+            GameStatus::Failed(answer) => answer,
         },
         egui::FontId {
             size: metrics::KEY_FONT_SIZE * factor,
@@ -394,14 +394,7 @@ pub fn keyboard(
                     }
                 }
                 _ => {
-                    if letter_key(
-                        ui,
-                        dark,
-                        c,
-                        &alphabet[game::get_index(c.to_ascii_lowercase())],
-                        x,
-                        y,
-                    ) {
+                    if letter_key(ui, dark, c, &alphabet[game::get_index(c)], x, y) {
                         pressed = Some(c);
                     }
                 }

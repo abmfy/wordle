@@ -94,9 +94,12 @@ impl WordleApp {
         // Load word lists
         app.word_list = builtin_words::ACCEPTABLE
             .iter()
-            .map(|s| s.to_string())
+            .map(|s| s.to_uppercase())
             .collect();
-        app.answer_list = builtin_words::FINAL.iter().map(|s| s.to_string()).collect();
+        app.answer_list = builtin_words::FINAL
+            .iter()
+            .map(|s| s.to_uppercase())
+            .collect();
 
         let mut rng =
             rand::rngs::StdRng::seed_from_u64(app.args.seed.unwrap_or(args::DEFAULT_SEED));
@@ -234,13 +237,13 @@ impl eframe::App for WordleApp {
                 self.args.difficult,
                 game.get_alphabet(),
                 self.game_status.as_ref().unwrap(),
-                game.is_valid_guess(&self.guess.to_lowercase(), &self.word_list),
+                game.is_valid_guess(&self.guess, &self.word_list),
             ) {
                 if self.game_status == Some(GameStatus::Going) {
                     match key {
                         // Guess
                         keyboard::ENTER => {
-                            let result = game.guess(&self.guess.to_lowercase(), &self.word_list);
+                            let result = game.guess(&self.guess, &self.word_list);
                             match result {
                                 Ok(game_status) => {
                                     // Clear guess for next guess to use

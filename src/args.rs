@@ -125,7 +125,7 @@ impl Args {
             }
         }
         if let Some(ref word) = self.word {
-            if !answer_list.contains(&word.to_lowercase()) {
+            if !answer_list.contains(&word.to_uppercase()) {
                 return Err("Provided answer is not in the answer words list!".to_string());
             }
         }
