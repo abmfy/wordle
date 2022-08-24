@@ -265,10 +265,9 @@ impl eframe::App for WordleApp {
                         }
                     }
                 } else {
-                    // When game overed, we only need to check click on restart button
-                    if key == keyboard::BACKSPACE {
+                    // When game overed use either ENTER or BACKSPACE to restart
+                    if key == keyboard::BACKSPACE || key == keyboard::ENTER {
                         self.game = None;
-                        self.guess.clear();
                     }
                 }
             }

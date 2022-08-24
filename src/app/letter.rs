@@ -3,6 +3,7 @@ use egui::{Align2, Color32, FontFamily, Pos2, Rect, Sense, Vec2};
 use crate::game::LetterStatus;
 
 use super::colors;
+use super::keyboard;
 use super::metrics;
 use super::utils;
 
@@ -82,19 +83,36 @@ impl Letter {
     }
 }
 
-/// Responsively scale the size of a letter to make sure contents don't cover each other
-fn get_letter_size_factor(ui: &egui::Ui) -> f32 {
-    // How many height does the grid expects to occupy
-    let expected = metrics::ROWS as f32 * (metrics::LETTER_BOX_SIZE + metrics::LETTER_MARGIN)
-        - metrics::LETTER_MARGIN;
-    // How many height is available for use after allocation to header and keyboard
-    let available = utils::get_screen_height(ui)
+/// How many height does the grid expects to occupy
+fn get_expected_height(ui: &egui::Ui) -> f32 {
+    (metrics::ROWS as f32 * (metrics::LETTER_BOX_SIZE + metrics::LETTER_MARGIN)
+        - metrics::LETTER_MARGIN)
+        * keyboard::get_keyboard_size_factor(ui)
+}
+
+/// How many height is available for use after allocation to header and keyboard
+fn get_available_height(ui: &egui::Ui) -> f32 {
+    let keyboard_height = (metrics::KEYBAORD_ROWS as f32
+        * (metrics::KEY_HEIGHT + metrics::KEY_V_MARGIN)
+        + metrics::KEY_V_MARGIN)
+        * keyboard::get_keyboard_size_factor(ui);
+    utils::get_screen_height(ui)
         - metrics::HEADER_HEIGHT
         - metrics::HEADING_GRID_GAP
-        - metrics::KEYBAORD_ROWS as f32 * (metrics::KEY_HEIGHT + metrics::KEY_V_MARGIN)
-        - metrics::KEY_V_MARGIN;
+        - keyboard_height
+}
+
+/// Responsively scale the size of a letter to make sure contents don't cover each other
+fn get_letter_size_factor(ui: &egui::Ui) -> f32 {
+    let expected = get_expected_height(ui);
+    let available = get_available_height(ui);
     // Scale the letter grid to fit in available space
-    return (available / expected).min(1.0);
+    let mut factor = (available / expected).min(1.0);
+    // On small width device (like a phone)
+    if keyboard::get_keyboard_size_factor(ui) != 1.0 {
+        factor *= keyboard::get_keyboard_size_factor(ui);
+    }
+    factor
 }
 
 /// The letter widget
@@ -112,7 +130,14 @@ pub fn letter(ui: &mut egui::Ui, dark: bool, row: i32, column: i32, letter: &Let
     // Compute x and y position where we put the letter
     let x = utils::get_screen_width(ui) / 2.0 - (box_size + margin) * 2.0 - box_size / 2.0
         + (box_size + margin) * column as f32;
-    let y = metrics::HEADER_HEIGHT + metrics::HEADING_GRID_GAP + (box_size + margin) * row as f32;
+    let y = metrics::HEADER_HEIGHT
+        + metrics::HEADING_GRID_GAP
+        + (box_size + margin) * row as f32
+        + if get_available_height(ui) > get_expected_height(ui) {
+            (get_available_height(ui) - get_expected_height(ui)) / 2.0
+        } else {
+            0.0
+        };
 
     // Painting rect
     let rect = Rect::from_min_size(

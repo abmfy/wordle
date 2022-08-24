@@ -1,3 +1,6 @@
+// The padding of the screen
+pub const PADDING: f32 = 12.0;
+
 // The height of the top panel of the app
 pub const HEADER_HEIGHT: f32 = 76.0;
 

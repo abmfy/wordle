@@ -7,6 +7,25 @@ use super::{colors, metrics, utils};
 pub const ENTER: char = '\n';
 pub const BACKSPACE: char = '\x08';
 
+/// How many width does the keyboard expects to occupy
+fn get_expected_width() -> f32 {
+    (metrics::KEY_WIDTH + metrics::KEY_H_MARGIN) * 10.0 - metrics::KEY_H_MARGIN
+        + metrics::PADDING * 2.0
+}
+
+/// How many width is available for use
+fn get_available_width(ui: &egui::Ui) -> f32 {
+    utils::get_screen_width(ui)
+}
+
+/// Responsively scale the size of the keyboard to make sure it fits in the screen
+pub fn get_keyboard_size_factor(ui: &egui::Ui) -> f32 {
+    let expected = get_expected_width();
+    let available = get_available_width(ui);
+    // Scale the letter grid to fit in available space
+    return (available / expected).min(1.0);
+}
+
 fn get_key_fill_color(dark: bool, status: &LetterStatus) -> Color32 {
     if dark {
         match status {
@@ -126,12 +145,14 @@ fn letter_key(
     x: f32,
     y: f32,
 ) -> bool {
+    let factor = get_keyboard_size_factor(ui);
+
     // Widget rect
     let rect = Rect::from_min_size(
         Pos2 { x, y },
         Vec2 {
-            x: metrics::KEY_WIDTH,
-            y: metrics::KEY_HEIGHT,
+            x: metrics::KEY_WIDTH * factor,
+            y: metrics::KEY_HEIGHT * factor,
         },
     );
 
@@ -163,7 +184,7 @@ fn letter_key(
         Align2::CENTER_CENTER,
         c,
         egui::FontId {
-            size: metrics::KEY_FONT_SIZE,
+            size: metrics::KEY_FONT_SIZE * factor,
             family: FontFamily::Name("SF".into()),
         },
         utils::animate_color(
@@ -185,12 +206,14 @@ fn enter_key(
     x: f32,
     y: f32,
 ) -> bool {
+    let factor = get_keyboard_size_factor(ui);
+
     // Widget rect
     let rect = Rect::from_min_size(
         Pos2 { x, y },
         Vec2 {
-            x: metrics::KEY_WIDTH_LARGE,
-            y: metrics::KEY_HEIGHT,
+            x: metrics::KEY_WIDTH_LARGE * factor,
+            y: metrics::KEY_HEIGHT * factor,
         },
     );
 
@@ -244,7 +267,7 @@ fn enter_key(
             GameStatus::Failed(answer) => answer.to_uppercase(),
         },
         egui::FontId {
-            size: metrics::KEY_FONT_SIZE,
+            size: metrics::KEY_FONT_SIZE * factor,
             family: FontFamily::Name("SF".into()),
         },
         utils::animate_color(
@@ -259,12 +282,14 @@ fn enter_key(
 
 /// Backspace key, meanwhile shows a message when game over
 fn backspace_key(ui: &mut egui::Ui, dark: bool, status: &GameStatus, x: f32, y: f32) -> bool {
+    let factor = get_keyboard_size_factor(ui);
+
     // Widget rect
     let rect = Rect::from_min_size(
         Pos2 { x, y },
         Vec2 {
-            x: metrics::KEY_WIDTH_LARGE,
-            y: metrics::KEY_HEIGHT,
+            x: metrics::KEY_WIDTH_LARGE * factor,
+            y: metrics::KEY_HEIGHT * factor,
         },
     );
 
@@ -300,6 +325,7 @@ fn backspace_key(ui: &mut egui::Ui, dark: bool, status: &GameStatus, x: f32, y: 
         },
         egui::FontId {
             size: metrics::KEY_FONT_SIZE
+                * factor
                 * if status == &GameStatus::Going {
                     1.5
                 } else {
@@ -328,30 +354,33 @@ pub fn keyboard(
 ) -> Option<char> {
     let mut pressed: Option<char> = None;
 
+    let factor = get_keyboard_size_factor(ui);
+
     // Render the r-th row
     let mut row = |r, letters: &str| {
-        let mut row_width = letters.len() as f32 * (metrics::KEY_WIDTH + metrics::KEY_H_MARGIN)
-            - metrics::KEY_H_MARGIN;
+        let mut row_width = metrics::PADDING * 2.0
+            + letters.len() as f32 * (metrics::KEY_WIDTH + metrics::KEY_H_MARGIN) * factor
+            - metrics::KEY_H_MARGIN * factor;
         if letters.contains(ENTER) {
-            row_width += metrics::KEY_WIDTH_LARGE - metrics::KEY_WIDTH;
+            row_width += (metrics::KEY_WIDTH_LARGE - metrics::KEY_WIDTH) * factor;
         }
         if letters.contains(BACKSPACE) {
-            row_width += metrics::KEY_WIDTH_LARGE - metrics::KEY_WIDTH;
+            row_width += (metrics::KEY_WIDTH_LARGE - metrics::KEY_WIDTH) * factor;
         }
-        let mut allocated_width = 0.0f32;
+        let mut allocated_width = metrics::PADDING;
         for c in letters.chars() {
             let x = {
                 let x = utils::get_screen_width(ui) / 2.0 - row_width / 2.0 + allocated_width;
-                allocated_width += metrics::KEY_H_MARGIN
+                allocated_width += metrics::KEY_H_MARGIN * factor
                     + if c == ENTER {
                         metrics::KEY_WIDTH_LARGE
                     } else {
                         metrics::KEY_WIDTH
-                    };
+                    } * factor;
                 x
             };
             let y = utils::get_screen_height(ui)
-                - (metrics::KEY_HEIGHT + metrics::KEY_V_MARGIN) * (3.0 + 1.0 - r as f32);
+                - (metrics::KEY_HEIGHT + metrics::KEY_V_MARGIN) * (3.0 + 1.0 - r as f32) * factor;
             // Detect keystroke
             match c {
                 ENTER => {
