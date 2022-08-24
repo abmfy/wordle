@@ -199,7 +199,8 @@ impl eframe::App for WordleApp {
                 self.args.difficult,
                 game.get_alphabet(),
                 self.game_status.as_ref().unwrap(),
-                game.is_valid_guess(&self.guess, &self.word_list),
+                game.validate_guess(self.args.difficult, false, &self.guess, &self.word_list)
+                    .is_ok(),
             ) {
                 if self.game_status == Some(GameStatus::Going) {
                     match key {

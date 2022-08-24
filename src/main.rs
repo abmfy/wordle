@@ -106,6 +106,8 @@ fn exit_with_error(is_tty: bool, message: &str) -> ! {
 /// The main function for the Wordle game, for native run
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
+    use rand::Rng;
+
     let is_tty = atty::is(atty::Stream::Stdout);
 
     let mut args = Args::parse();
@@ -207,7 +209,7 @@ fn main() {
     // Print welcome message
     if is_tty {
         println!(
-            "Welcome to {}{}{}{}{}{}!\n",
+            "Welcome to {}{}{}{}{}{}!",
             console::style('W').bold().red(),
             console::style('o').bold().color256(208),
             console::style('r').bold().yellow(),
@@ -215,6 +217,8 @@ fn main() {
             console::style('l').bold().blue(),
             console::style('e').bold().color256(93),
         );
+
+        println!("Note that you can type 'HINT' to get hints in the game!\n");
 
         let name = {
             print!(
@@ -292,6 +296,22 @@ fn main() {
                 None => exit_game(is_tty),
             };
             let word = word.to_uppercase();
+
+            // Get hint
+            if word == "HINT" {
+                let mut rng = rand::thread_rng();
+                let hint = loop {
+                    let index = rng.gen_range(0..word_list.len());
+                    let word = &word_list[index];
+                    if game.validate_guess(true, true, word, &word_list).is_ok() {
+                        break word;
+                    }
+                };
+
+                println!("{}", console::style(hint).bold().blue());
+                continue;
+            }
+
             let result = game.guess(&word, &word_list);
             match result {
                 Ok(game_status) => {

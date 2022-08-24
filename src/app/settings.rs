@@ -50,7 +50,7 @@ pub fn settings(ui: &mut egui::Ui, app: &mut WordleApp) {
                     .wrap(true),
             );
 
-            if ui.button("Restart").clicked() {
+            if ui.button("Go").clicked() {
                 app.start();
             };
         });

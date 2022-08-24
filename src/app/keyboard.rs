@@ -321,7 +321,7 @@ fn backspace_key(ui: &mut egui::Ui, dark: bool, status: &GameStatus, x: f32, y: 
         Align2::CENTER_CENTER,
         match status {
             GameStatus::Going => "⌫",
-            GameStatus::Won(_) | GameStatus::Failed(_) => "RESTART",
+            GameStatus::Won(_) | GameStatus::Failed(_) => "NEXT",
         },
         egui::FontId {
             size: metrics::KEY_FONT_SIZE
@@ -329,7 +329,7 @@ fn backspace_key(ui: &mut egui::Ui, dark: bool, status: &GameStatus, x: f32, y: 
                 * if status == &GameStatus::Going {
                     1.5
                 } else {
-                    0.8
+                    1.0
                 },
             family: FontFamily::Name("SF".into()),
         },

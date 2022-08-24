@@ -76,6 +76,15 @@ pub enum GameStatus {
     Failed(String),
 }
 
+// Auxiliary type and function for counting occurrence of letters
+type Counter = HashMap<char, usize>;
+fn count(counter: &mut Counter, letter: char) -> usize {
+    *counter
+        .entry(letter)
+        .and_modify(|cnt| *cnt += 1)
+        .or_insert(1)
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Game {
     answer: String,
@@ -109,43 +118,42 @@ impl Game {
         &self.guesses
     }
 
-    // Setter for difficult
+    /// Setter for difficult
     pub fn set_difficult(&mut self, difficult: bool) {
         self.difficult = difficult;
     }
 
-    // Getter for alphabet
+    /// Getter for alphabet
     pub fn get_alphabet(&self) -> &Alphabet {
         &&self.alphabet
     }
 
-    /// Get the status of a guess
-    fn get_guess_status(&self, word: &str) -> Result<GuessStatus, Error> {
-        // Auxiliary type and function for counting occurrence of letters
-        type Counter = HashMap<char, usize>;
-        fn count(counter: &mut Counter, letter: char) -> usize {
-            *counter
-                .entry(letter)
-                .and_modify(|cnt| *cnt += 1)
-                .or_insert(1)
+    /// Check whether a word can make a valid guess
+    /// Param strict: Strictly validate a guess
+    /// That is, any letter which has been revealed to not exist in the answer
+    /// is not allowed to appear in the guess
+    /// This is used by the hint feature
+    pub fn validate_guess(
+        &self,
+        difficult: bool,
+        strict: bool,
+        word: &String,
+        word_list: &Vec<String>,
+    ) -> Result<(), Error> {
+        // The word list doesn't contains the word
+        if word_list.binary_search(word).is_err() {
+            return Err(Error::UnknownWord);
         }
+        // If in difficult mode, do extra checks
+        if difficult {
+            let mut guess_counter = Counter::new();
+            word.chars().for_each(|c| {
+                count(&mut guess_counter, c);
+            });
 
-        // Count occurrence of letters in the answer
-        let mut ans_counter = Counter::new();
-        self.answer.chars().for_each(|c| {
-            count(&mut ans_counter, c);
-        });
-
-        // Difficult mode check
-        if self.difficult && self.get_round() > 0 {
             // Check all guesses because in GUI mode the user may switch between
             // difficult mode and normal mode several times.
             for (guess, status) in &self.guesses {
-                let mut guess_counter = Counter::new();
-                word.chars().for_each(|c| {
-                    count(&mut guess_counter, c);
-                });
-
                 // Count the occurrence of yellow and green letters for check
                 let mut last_guess_counter = Counter::new();
 
@@ -165,13 +173,48 @@ impl Game {
                     }
                 }
 
+                // Yellow letters should occur
                 for (letter, count) in &last_guess_counter {
                     if guess_counter.get(letter).unwrap_or(&0) < count {
                         return Err(Error::HintUnused);
                     }
                 }
+
+                if strict {
+                    for ((i, last_letter), now_letter) in
+                        guess.chars().enumerate().zip(word.chars())
+                    {
+                        match status[i] {
+                            // Strict rule 1: the count of red letters should be equal
+                            LetterStatus::Red => {
+                                if guess_counter.get(&last_letter).unwrap_or(&0)
+                                    != last_guess_counter.get(&last_letter).unwrap_or(&0)
+                                {
+                                    return Err(Error::HintUnused);
+                                }
+                            }
+                            // Strict rule 2: yellow letters shouldn't appear in the same position
+                            LetterStatus::Yellow => {
+                                if now_letter == last_letter {
+                                    return Err(Error::HintUnused);
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                }
             }
         }
+        Ok(())
+    }
+
+    /// Get the status of a guess
+    fn get_guess_status(&self, word: &str) -> GuessStatus {
+        // Count occurrence of letters in the answer
+        let mut ans_counter = Counter::new();
+        self.answer.chars().for_each(|c| {
+            count(&mut ans_counter, c);
+        });
 
         let mut result = [LetterStatus::Unknown; WORD_LENGTH];
 
@@ -197,7 +240,7 @@ impl Game {
                 LetterStatus::Red
             };
         });
-        Ok(result)
+        result
     }
 
     /// Update the alphabet based on the result of a guess
@@ -209,23 +252,16 @@ impl Game {
         }
     }
 
-    // Check whether a word can make a valid guess
-    pub fn is_valid_guess(&self, word: &String, word_list: &Vec<String>) -> bool {
-        // The word should be in acceptable list and should use the hint in difficult mode
-        word_list.binary_search(word).is_ok() && self.get_guess_status(word).is_ok()
-    }
-
     /// Make a guess
     pub fn guess(&mut self, word: &String, word_list: &Vec<String>) -> Result<GameStatus, Error> {
         if word.len() != WORD_LENGTH {
             return Err(Error::UnexpectedWordLength);
         }
-        // Word not in acceptable word list
-        if word_list.binary_search(word).is_err() {
-            return Err(Error::UnknownWord);
-        }
 
-        let guess_status = self.get_guess_status(word)?;
+        // Guess validation
+        self.validate_guess(self.difficult, false, word, word_list)?;
+
+        let guess_status = self.get_guess_status(word);
         self.update_alphabet(word, &guess_status);
         self.guesses.push((word.to_string(), guess_status));
 
