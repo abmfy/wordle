@@ -12,7 +12,7 @@ pub fn get_screen_height(ui: &egui::Ui) -> f32 {
 
 // Make a smooth transition when color changes
 pub fn animate_color(ui: &egui::Ui, id: String, color: Color32) -> Color32 {
-    const DURATION: f32 = 1.0;
+    const DURATION: f32 = 0.5;
 
     fn animate_value(ui: &egui::Ui, id: &String, suffix: &str, value: u8) -> u8 {
         ui.ctx()

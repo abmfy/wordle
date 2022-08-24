@@ -202,13 +202,19 @@ impl Game {
         }
     }
 
+    // Check whether a word can make a valid guess
+    pub fn is_valid_guess(&self, word: &String, word_list: &Vec<String>) -> bool {
+        // The word should be in acceptable list and should use the hint in difficult mode
+        word_list.binary_search(word).is_ok() && self.get_guess_status(word).is_ok()
+    }
+
     /// Make a guess
-    pub fn guess(&mut self, word: &str, word_list: &Vec<String>) -> Result<GameStatus, Error> {
+    pub fn guess(&mut self, word: &String, word_list: &Vec<String>) -> Result<GameStatus, Error> {
         if word.len() != WORD_LENGTH {
             return Err(Error::UnexpectedWordLength);
         }
         // Word not in acceptable word list
-        if word_list.binary_search(&word.to_string()).is_err() {
+        if word_list.binary_search(word).is_err() {
             return Err(Error::UnknownWord);
         }
 

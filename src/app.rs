@@ -1,4 +1,4 @@
-use egui::{CollapsingHeader, FontData, FontDefinitions, FontFamily, Frame, RichText};
+use egui::{CollapsingHeader, FontData, FontDefinitions, FontFamily, Frame, Label, RichText};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
@@ -122,11 +122,14 @@ impl eframe::App for WordleApp {
             // Setting panel
             Frame::window(ui.style()).show(ui, |ui| {
                 CollapsingHeader::new("Settings").show(ui, |ui| {
+                    ui.set_max_width(200.0);
                     // TODO: unimplemented
-                    if ui.button("Restart").clicked() {
-                        self.game = None;
-                        self.guess.clear();
-                    }
+                    ui.add(Label::new("The settings will go into effect next game.").wrap(true));
+                    ui.checkbox(&mut self.args.difficult, "Hard Mode");
+                    ui.add(
+                        Label::new("Any revealed hints must be used in subsequent guesses.")
+                            .wrap(true),
+                    );
                 });
             });
 
@@ -206,7 +209,12 @@ impl eframe::App for WordleApp {
             }
 
             // Render the keyboard and get keyboard input
-            if let Some(key) = keyboard(ui, game.get_alphabet()) {
+            if let Some(key) = keyboard(
+                ui,
+                game.get_alphabet(),
+                self.game_status.as_ref().unwrap(),
+                game.is_valid_guess(&self.guess.to_lowercase(), &self.word_list),
+            ) {
                 if self.game_status == Some(GameStatus::Going) {
                     match key {
                         // Guess
@@ -216,20 +224,12 @@ impl eframe::App for WordleApp {
                                 Ok(game_status) => {
                                     // Clear guess for next guess to use
                                     self.guess.clear();
-                                    match game_status {
-                                        GameStatus::Won(round) => {
-                                            println!("Won! {round}");
-                                        }
-                                        GameStatus::Failed(ref answer) => {
-                                            println!("Failed {answer}");
-                                        }
-                                        GameStatus::Going => (),
-                                    }
 
                                     // Save game status
                                     self.game_status = Some(game_status);
                                 }
-                                Err(error) => println!("{}", error.what()),
+                                // Do nothing because we've indicated the guess is invalid by the enter button
+                                Err(_) => (),
                             }
                         }
                         keyboard::BACKSPACE => {
@@ -242,6 +242,12 @@ impl eframe::App for WordleApp {
                                 self.guess.push(key);
                             }
                         }
+                    }
+                } else {
+                    // When game overed, we only need to check click on restart button
+                    if key == keyboard::BACKSPACE {
+                        self.game = None;
+                        self.guess.clear();
                     }
                 }
             }

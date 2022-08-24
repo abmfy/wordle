@@ -1,11 +1,8 @@
 use egui::{Align2, Color32, CursorIcon, FontFamily, Key, Modifiers, Pos2, Rect, Sense, Vec2};
 
-use crate::game::{self, Alphabet, LetterStatus};
+use crate::game::{self, Alphabet, GameStatus, LetterStatus};
 
-use super::{
-    colors, metrics,
-    utils::{self, animate_color},
-};
+use super::{colors, metrics, utils};
 
 pub const ENTER: char = '\n';
 pub const BACKSPACE: char = '\x08';
@@ -27,15 +24,12 @@ pub fn get_key_text_color(status: &LetterStatus) -> Color32 {
 }
 
 /// A key in the keyboard widget, returns whether this key is clicked
-pub fn key(ui: &mut egui::Ui, c: char, status: &LetterStatus, x: f32, y: f32) -> bool {
+fn letter_key(ui: &mut egui::Ui, c: char, status: &LetterStatus, x: f32, y: f32) -> bool {
     // Widget rect
     let rect = Rect::from_min_size(
         Pos2 { x, y },
         Vec2 {
-            x: match c {
-                ENTER | BACKSPACE => metrics::KEY_WIDTH_LARGE,
-                _ => metrics::KEY_WIDTH,
-            },
+            x: metrics::KEY_WIDTH,
             y: metrics::KEY_HEIGHT,
         },
     );
@@ -46,7 +40,7 @@ pub fn key(ui: &mut egui::Ui, c: char, status: &LetterStatus, x: f32, y: f32) ->
     // Render different colors depending on cursor state
     let color = {
         let mut color = get_key_fill_color(status);
-        color = animate_color(ui, format!("key{c}f"), color);
+        color = utils::animate_color(ui, format!("key{c}f"), color);
         if response.hovered() {
             color = color.linear_multiply(0.8);
         }
@@ -66,19 +60,172 @@ pub fn key(ui: &mut egui::Ui, c: char, status: &LetterStatus, x: f32, y: f32) ->
     ui.painter().text(
         rect.center(),
         Align2::CENTER_CENTER,
-        match c {
-            ENTER => "ENTER".to_string(),
-            BACKSPACE => "⌫".to_string(),
-            _ => c.to_string(),
-        },
+        c,
         egui::FontId {
-            size: match c {
-                BACKSPACE => metrics::KEY_FONT_SIZE * 1.5,
-                _ => metrics::KEY_FONT_SIZE,
-            },
+            size: metrics::KEY_FONT_SIZE,
             family: FontFamily::Proportional,
         },
-        animate_color(ui, format!("key{c}t"), get_key_text_color(status)),
+        utils::animate_color(ui, format!("key{c}t"), get_key_text_color(status)),
+    );
+
+    response.clicked()
+}
+
+/// Enter key, meanwhile shows a message when game over
+fn enter_key(ui: &mut egui::Ui, status: &GameStatus, valid: bool, x: f32, y: f32) -> bool {
+    // Widget rect
+    let rect = Rect::from_min_size(
+        Pos2 { x, y },
+        Vec2 {
+            x: metrics::KEY_WIDTH_LARGE,
+            y: metrics::KEY_HEIGHT,
+        },
+    );
+
+    // We need to sense click event when the input is valid
+    let mut response = ui.allocate_rect(
+        rect,
+        if valid {
+            Sense::click()
+        } else {
+            Sense::hover()
+        },
+    );
+
+    // Render different colors depending on cursor state
+    let color = {
+        let mut color = match status {
+            GameStatus::Going => {
+                if valid {
+                    colors::GRAY
+                } else {
+                    colors::DARK_GRAY
+                }
+            }
+            GameStatus::Won(_) => colors::GREEN,
+            GameStatus::Failed(_) => colors::YELLOW,
+        };
+        color = utils::animate_color(ui, format!("key{}f", "ENTER"), color);
+        if valid {
+            if response.hovered() {
+                color = color.linear_multiply(0.8);
+            }
+            if response.is_pointer_button_down_on() {
+                color = color.linear_multiply(1.5);
+            }
+        }
+        color
+    };
+
+    // Change cursor style when hovered
+    response = response.on_hover_cursor(match status {
+        GameStatus::Going => {
+            if valid {
+                CursorIcon::PointingHand
+            } else {
+                CursorIcon::NotAllowed
+            }
+        }
+        GameStatus::Won(_) | GameStatus::Failed(_) => CursorIcon::Default,
+    });
+
+    // Paint rect
+    ui.painter()
+        .rect(rect, metrics::KEY_RADIUS, color, (0.0, colors::GRAY));
+    // Paint text
+    ui.painter().text(
+        rect.center(),
+        Align2::CENTER_CENTER,
+        match status {
+            GameStatus::Going => "ENTER".to_string(),
+            GameStatus::Won(_) => "Bravo!".to_string(),
+            GameStatus::Failed(answer) => answer.to_uppercase(),
+        },
+        egui::FontId {
+            size: metrics::KEY_FONT_SIZE,
+            family: FontFamily::Proportional,
+        },
+        utils::animate_color(
+            ui,
+            format!("key{}t", "ENTER"),
+            match status {
+                GameStatus::Going => {
+                    if valid {
+                        colors::BLACK
+                    } else {
+                        colors::GRAY
+                    }
+                }
+                GameStatus::Won(_) | GameStatus::Failed(_) => colors::WHITE,
+            },
+        ),
+    );
+
+    response.clicked()
+}
+
+/// Backspace key, meanwhile shows a message when game over
+fn backspace_key(ui: &mut egui::Ui, status: &GameStatus, x: f32, y: f32) -> bool {
+    // Widget rect
+    let rect = Rect::from_min_size(
+        Pos2 { x, y },
+        Vec2 {
+            x: metrics::KEY_WIDTH_LARGE,
+            y: metrics::KEY_HEIGHT,
+        },
+    );
+
+    // We need to sense click event
+    let mut response = ui.allocate_rect(rect, Sense::click());
+
+    // Render different colors depending on cursor state
+    let color = {
+        let mut color = match status {
+            GameStatus::Going => colors::GRAY,
+            GameStatus::Won(_) => colors::GREEN,
+            GameStatus::Failed(_) => colors::YELLOW,
+        };
+        color = utils::animate_color(ui, format!("key{}f", "BACKSPACE"), color);
+        if response.hovered() {
+            color = color.linear_multiply(0.8);
+        }
+        if response.is_pointer_button_down_on() {
+            color = color.linear_multiply(1.5);
+        }
+        color
+    };
+
+    // Change cursor style when hovered
+    response = response.on_hover_cursor(CursorIcon::PointingHand);
+
+    // Paint rect
+    ui.painter()
+        .rect(rect, metrics::KEY_RADIUS, color, (0.0, colors::GRAY));
+    // Paint text
+    ui.painter().text(
+        rect.center(),
+        Align2::CENTER_CENTER,
+        match status {
+            GameStatus::Going => "⌫",
+            GameStatus::Won(_) | GameStatus::Failed(_) => "RESTART",
+        },
+        egui::FontId {
+            size: metrics::KEY_FONT_SIZE
+                * if status == &GameStatus::Going {
+                    1.5
+                } else {
+                    0.8
+                },
+            family: FontFamily::Proportional,
+        },
+        utils::animate_color(
+            ui,
+            format!("key{}t", "BACKSPACE"),
+            match status {
+                GameStatus::Going => colors::BLACK,
+                GameStatus::Won(_) | GameStatus::Failed(_) => colors::WHITE,
+            },
+        ),
     );
 
     response.clicked()
@@ -86,17 +233,16 @@ pub fn key(ui: &mut egui::Ui, c: char, status: &LetterStatus, x: f32, y: f32) ->
 
 /// The keyboard widget
 /// Returns which key is pressed
-pub fn keyboard(ui: &mut egui::Ui, alphabet: &Alphabet) -> Option<char> {
+pub fn keyboard(
+    ui: &mut egui::Ui,
+    alphabet: &Alphabet,
+    status: &GameStatus,
+    valid: bool,
+) -> Option<char> {
     let mut pressed: Option<char> = None;
 
     // Render the r-th row
-    fn row(
-        r: i32,
-        ui: &mut egui::Ui,
-        pressed: &mut Option<char>,
-        alphabet: &Alphabet,
-        letters: &str,
-    ) {
+    let mut row = |r, letters: &str| {
         let mut row_width = letters.len() as f32 * (metrics::KEY_WIDTH + metrics::KEY_H_MARGIN)
             - metrics::KEY_H_MARGIN;
         if letters.contains(ENTER) {
@@ -121,34 +267,34 @@ pub fn keyboard(ui: &mut egui::Ui, alphabet: &Alphabet) -> Option<char> {
                 - (metrics::KEY_HEIGHT + metrics::KEY_V_MARGIN) * (3.0 + 1.0 - r as f32);
             // Detect keystroke
             match c {
-                ENTER | BACKSPACE => {
-                    if key(ui, c, &LetterStatus::Unknown, x, y) {
-                        *pressed = Some(c)
+                ENTER => {
+                    if enter_key(ui, status, valid, x, y) {
+                        pressed = Some(c)
+                    }
+                }
+                BACKSPACE => {
+                    if backspace_key(ui, status, x, y) {
+                        pressed = Some(c)
                     }
                 }
                 _ => {
-                    if key(
+                    if letter_key(
                         ui,
                         c,
                         &alphabet[game::get_index(c.to_ascii_lowercase())],
                         x,
                         y,
                     ) {
-                        *pressed = Some(c);
+                        pressed = Some(c);
                     }
                 }
             }
         }
-    }
-    row(1, ui, &mut pressed, &alphabet, "QWERTYUIOP");
-    row(2, ui, &mut pressed, &alphabet, "ASDFGHJKL");
-    row(
-        3,
-        ui,
-        &mut pressed,
-        &alphabet,
-        &format!("{ENTER}ZXCVBNM{BACKSPACE}"),
-    );
+    };
+
+    row(1, "QWERTYUIOP");
+    row(2, "ASDFGHJKL");
+    row(3, &format!("{ENTER}ZXCVBNM{BACKSPACE}"));
 
     // Track physical keyboard input
     const TRACKED_KEYS: [egui::Key; 28] = [
