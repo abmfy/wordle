@@ -15,39 +15,69 @@ pub struct Letter {
 
 impl Letter {
     /// Get the stroke color for a letter
-    fn get_stroke_color(&self) -> Color32 {
-        if let Some(_) = self.letter {
-            match self.status {
-                LetterStatus::Unknown => colors::DARK_GRAY,
-                LetterStatus::Red => colors::DARK_GRAY,
-                LetterStatus::Yellow => colors::YELLOW,
-                LetterStatus::Green => colors::GREEN,
+    fn get_stroke_color(&self, dark: bool) -> Color32 {
+        if dark {
+            if let Some(_) = self.letter {
+                match self.status {
+                    LetterStatus::Unknown => colors::DARK_MODE_GRAY,
+                    LetterStatus::Red => colors::DARK_MODE_DARK_GRAY,
+                    LetterStatus::Yellow => colors::DARK_MODE_YELLOW,
+                    LetterStatus::Green => colors::DARK_MODE_GREEN,
+                }
+            } else {
+                colors::DARK_MODE_DARK_GRAY
             }
         } else {
-            colors::GRAY
+            if let Some(_) = self.letter {
+                match self.status {
+                    LetterStatus::Unknown => colors::DARK_GRAY,
+                    LetterStatus::Red => colors::DARK_GRAY,
+                    LetterStatus::Yellow => colors::YELLOW,
+                    LetterStatus::Green => colors::GREEN,
+                }
+            } else {
+                colors::GRAY
+            }
         }
     }
 
     /// Get the fill color for a letter
-    fn get_fill_color(&self) -> Color32 {
-        if let Some(_) = self.letter {
-            match self.status {
-                LetterStatus::Unknown => colors::WHITE,
-                LetterStatus::Red => colors::DARK_GRAY,
-                LetterStatus::Yellow => colors::YELLOW,
-                LetterStatus::Green => colors::GREEN,
+    fn get_fill_color(&self, dark: bool) -> Color32 {
+        if dark {
+            if let Some(_) = self.letter {
+                match self.status {
+                    LetterStatus::Unknown => colors::DARK_MODE_BLACK,
+                    LetterStatus::Red => colors::DARK_MODE_DARK_GRAY,
+                    LetterStatus::Yellow => colors::DARK_MODE_YELLOW,
+                    LetterStatus::Green => colors::DARK_MODE_GREEN,
+                }
+            } else {
+                colors::DARK_MODE_BLACK
             }
         } else {
-            colors::WHITE
+            if let Some(_) = self.letter {
+                match self.status {
+                    LetterStatus::Unknown => colors::WHITE,
+                    LetterStatus::Red => colors::DARK_GRAY,
+                    LetterStatus::Yellow => colors::YELLOW,
+                    LetterStatus::Green => colors::GREEN,
+                }
+            } else {
+                colors::WHITE
+            }
         }
     }
 
     /// Get the text color for a letter
-    fn get_text_color(&self) -> Color32 {
-        if self.status == LetterStatus::Unknown {
-            colors::BLACK
+    fn get_text_color(&self, dark: bool) -> Color32 {
+        if dark {
+            colors::DARK_MODE_WHITE
         } else {
-            colors::WHITE
+            if self.status == LetterStatus::Unknown {
+                colors::BLACK
+            } else {
+                colors::WHITE
+            }
         }
     }
 }
@@ -68,15 +98,16 @@ fn get_letter_size_factor(ui: &egui::Ui) -> f32 {
 }
 
 /// The letter widget
-pub fn letter(ui: &mut egui::Ui, row: i32, column: i32, letter: &Letter) {
+pub fn letter(ui: &mut egui::Ui, dark: bool, row: i32, column: i32, letter: &Letter) {
     // Assert parameters row and column are in correct range
     assert!((0..metrics::ROWS).contains(&row));
     assert!((0..metrics::COLUMNS).contains(&column));
 
     // Compute actual metrics
-    let box_size = get_letter_size_factor(ui) * metrics::LETTER_BOX_SIZE;
-    let margin = get_letter_size_factor(ui) * metrics::LETTER_MARGIN;
-    let font_size = get_letter_size_factor(ui) * metrics::LETTER_FONT_SIZE;
+    let factor = get_letter_size_factor(ui);
+    let box_size = factor * metrics::LETTER_BOX_SIZE;
+    let margin = factor * metrics::LETTER_MARGIN;
+    let font_size = factor * metrics::LETTER_FONT_SIZE;
 
     // Compute x and y position where we put the letter
     let x = utils::get_screen_width(ui) / 2.0 - (box_size + margin) * 2.0 - box_size / 2.0
@@ -96,15 +127,21 @@ pub fn letter(ui: &mut egui::Ui, row: i32, column: i32, letter: &Letter) {
     ui.allocate_rect(rect, Sense::hover());
 
     // Compute animated colors
-    let fill_color =
-        utils::animate_color(ui, format!("letter{row}{column}s"), letter.get_fill_color());
-    let stroke_color = utils::animate_color(
-        ui,
-        format!("letter{row}{column}f"),
-        letter.get_stroke_color(),
+    let fill_color = utils::animate_color(
+        ui.ctx(),
+        format!("letter{row}{column}s"),
+        letter.get_fill_color(dark),
     );
-    let text_color =
-        utils::animate_color(ui, format!("letter{row}{column}t"), letter.get_text_color());
+    let stroke_color = utils::animate_color(
+        ui.ctx(),
+        format!("letter{row}{column}f"),
+        letter.get_stroke_color(dark),
+    );
+    let text_color = utils::animate_color(
+        ui.ctx(),
+        format!("letter{row}{column}t"),
+        letter.get_text_color(dark),
+    );
 
     // Paint the rectangle area
     ui.painter().rect(
@@ -121,7 +158,7 @@ pub fn letter(ui: &mut egui::Ui, row: i32, column: i32, letter: &Letter) {
         letter.letter.unwrap_or(' '),
         egui::FontId {
             size: font_size,
-            family: FontFamily::Proportional,
+            family: FontFamily::Name("SF".into()),
         },
         text_color,
     );

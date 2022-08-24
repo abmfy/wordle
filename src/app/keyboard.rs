@@ -7,24 +7,125 @@ use super::{colors, metrics, utils};
 pub const ENTER: char = '\n';
 pub const BACKSPACE: char = '\x08';
 
-pub fn get_key_fill_color(status: &LetterStatus) -> Color32 {
-    match status {
-        LetterStatus::Unknown => colors::GRAY,
-        LetterStatus::Red => colors::DARK_GRAY,
-        LetterStatus::Yellow => colors::YELLOW,
-        LetterStatus::Green => colors::GREEN,
+fn get_key_fill_color(dark: bool, status: &LetterStatus) -> Color32 {
+    if dark {
+        match status {
+            LetterStatus::Unknown => colors::DARK_MODE_GRAY,
+            LetterStatus::Red => colors::DARK_MODE_DARK_GRAY,
+            LetterStatus::Yellow => colors::DARK_MODE_YELLOW,
+            LetterStatus::Green => colors::DARK_MODE_GREEN,
+        }
+    } else {
+        match status {
+            LetterStatus::Unknown => colors::GRAY,
+            LetterStatus::Red => colors::DARK_GRAY,
+            LetterStatus::Yellow => colors::YELLOW,
+            LetterStatus::Green => colors::GREEN,
+        }
     }
 }
 
-pub fn get_key_text_color(status: &LetterStatus) -> Color32 {
-    match status {
-        LetterStatus::Unknown => colors::BLACK,
-        _ => colors::WHITE,
+fn get_key_text_color(dark: bool, status: &LetterStatus) -> Color32 {
+    if dark {
+        colors::DARK_MODE_WHITE
+    } else {
+        match status {
+            LetterStatus::Unknown => colors::BLACK,
+            _ => colors::WHITE,
+        }
+    }
+}
+
+fn get_enter_key_fill_color(dark: bool, status: &GameStatus, valid: bool) -> Color32 {
+    if dark {
+        match status {
+            GameStatus::Going => {
+                if valid {
+                    colors::DARK_MODE_GRAY
+                } else {
+                    colors::DARK_MODE_DARK_GRAY
+                }
+            }
+            GameStatus::Won(_) => colors::DARK_MODE_GREEN,
+            GameStatus::Failed(_) => colors::DARK_MODE_YELLOW,
+        }
+    } else {
+        match status {
+            GameStatus::Going => {
+                if valid {
+                    colors::GRAY
+                } else {
+                    colors::DARK_GRAY
+                }
+            }
+            GameStatus::Won(_) => colors::GREEN,
+            GameStatus::Failed(_) => colors::YELLOW,
+        }
+    }
+}
+
+fn get_enter_key_text_color(dark: bool, status: &GameStatus, valid: bool) -> Color32 {
+    if dark {
+        match status {
+            GameStatus::Going => {
+                if valid {
+                    colors::DARK_MODE_WHITE
+                } else {
+                    colors::DARK_MODE_GRAY
+                }
+            }
+            GameStatus::Won(_) | GameStatus::Failed(_) => colors::DARK_MODE_WHITE,
+        }
+    } else {
+        match status {
+            GameStatus::Going => {
+                if valid {
+                    colors::BLACK
+                } else {
+                    colors::GRAY
+                }
+            }
+            GameStatus::Won(_) | GameStatus::Failed(_) => colors::WHITE,
+        }
+    }
+}
+
+fn get_backspace_key_fill_color(dark: bool, status: &GameStatus) -> Color32 {
+    if dark {
+        match status {
+            GameStatus::Going => colors::DARK_MODE_GRAY,
+            GameStatus::Won(_) => colors::DARK_MODE_GREEN,
+            GameStatus::Failed(_) => colors::DARK_MODE_YELLOW,
+        }
+    } else {
+        match status {
+            GameStatus::Going => colors::GRAY,
+            GameStatus::Won(_) => colors::GREEN,
+            GameStatus::Failed(_) => colors::YELLOW,
+        }
+    }
+}
+
+fn get_backspace_key_text_color(dark: bool, status: &GameStatus) -> Color32 {
+    if dark {
+        colors::DARK_MODE_WHITE
+    } else {
+        match status {
+            GameStatus::Going => colors::BLACK,
+            GameStatus::Won(_) | GameStatus::Failed(_) => colors::WHITE,
+        }
     }
 }
 
 /// A key in the keyboard widget, returns whether this key is clicked
-fn letter_key(ui: &mut egui::Ui, c: char, status: &LetterStatus, x: f32, y: f32) -> bool {
+fn letter_key(
+    ui: &mut egui::Ui,
+    dark: bool,
+    c: char,
+    status: &LetterStatus,
+    x: f32,
+    y: f32,
+) -> bool {
     // Widget rect
     let rect = Rect::from_min_size(
         Pos2 { x, y },
@@ -39,8 +140,8 @@ fn letter_key(ui: &mut egui::Ui, c: char, status: &LetterStatus, x: f32, y: f32)
 
     // Render different colors depending on cursor state
     let color = {
-        let mut color = get_key_fill_color(status);
-        color = utils::animate_color(ui, format!("key{c}f"), color);
+        let mut color = get_key_fill_color(dark, status);
+        color = utils::animate_color(ui.ctx(), format!("key{c}f"), color);
         if response.hovered() {
             color = color.linear_multiply(0.8);
         }
@@ -63,16 +164,27 @@ fn letter_key(ui: &mut egui::Ui, c: char, status: &LetterStatus, x: f32, y: f32)
         c,
         egui::FontId {
             size: metrics::KEY_FONT_SIZE,
-            family: FontFamily::Proportional,
+            family: FontFamily::Name("SF".into()),
         },
-        utils::animate_color(ui, format!("key{c}t"), get_key_text_color(status)),
+        utils::animate_color(
+            ui.ctx(),
+            format!("key{c}t"),
+            get_key_text_color(dark, status),
+        ),
     );
 
     response.clicked()
 }
 
 /// Enter key, meanwhile shows a message when game over
-fn enter_key(ui: &mut egui::Ui, status: &GameStatus, valid: bool, x: f32, y: f32) -> bool {
+fn enter_key(
+    ui: &mut egui::Ui,
+    dark: bool,
+    status: &GameStatus,
+    valid: bool,
+    x: f32,
+    y: f32,
+) -> bool {
     // Widget rect
     let rect = Rect::from_min_size(
         Pos2 { x, y },
@@ -94,18 +206,8 @@ fn enter_key(ui: &mut egui::Ui, status: &GameStatus, valid: bool, x: f32, y: f32
 
     // Render different colors depending on cursor state
     let color = {
-        let mut color = match status {
-            GameStatus::Going => {
-                if valid {
-                    colors::GRAY
-                } else {
-                    colors::DARK_GRAY
-                }
-            }
-            GameStatus::Won(_) => colors::GREEN,
-            GameStatus::Failed(_) => colors::YELLOW,
-        };
-        color = utils::animate_color(ui, format!("key{}f", "ENTER"), color);
+        let mut color = get_enter_key_fill_color(dark, status, valid);
+        color = utils::animate_color(ui.ctx(), format!("key{}f", "ENTER"), color);
         if valid {
             if response.hovered() {
                 color = color.linear_multiply(0.8);
@@ -143,21 +245,12 @@ fn enter_key(ui: &mut egui::Ui, status: &GameStatus, valid: bool, x: f32, y: f32
         },
         egui::FontId {
             size: metrics::KEY_FONT_SIZE,
-            family: FontFamily::Proportional,
+            family: FontFamily::Name("SF".into()),
         },
         utils::animate_color(
-            ui,
+            ui.ctx(),
             format!("key{}t", "ENTER"),
-            match status {
-                GameStatus::Going => {
-                    if valid {
-                        colors::BLACK
-                    } else {
-                        colors::GRAY
-                    }
-                }
-                GameStatus::Won(_) | GameStatus::Failed(_) => colors::WHITE,
-            },
+            get_enter_key_text_color(dark, status, valid),
         ),
     );
 
@@ -165,7 +258,7 @@ fn enter_key(ui: &mut egui::Ui, status: &GameStatus, valid: bool, x: f32, y: f32
 }
 
 /// Backspace key, meanwhile shows a message when game over
-fn backspace_key(ui: &mut egui::Ui, status: &GameStatus, x: f32, y: f32) -> bool {
+fn backspace_key(ui: &mut egui::Ui, dark: bool, status: &GameStatus, x: f32, y: f32) -> bool {
     // Widget rect
     let rect = Rect::from_min_size(
         Pos2 { x, y },
@@ -180,12 +273,8 @@ fn backspace_key(ui: &mut egui::Ui, status: &GameStatus, x: f32, y: f32) -> bool
 
     // Render different colors depending on cursor state
     let color = {
-        let mut color = match status {
-            GameStatus::Going => colors::GRAY,
-            GameStatus::Won(_) => colors::GREEN,
-            GameStatus::Failed(_) => colors::YELLOW,
-        };
-        color = utils::animate_color(ui, format!("key{}f", "BACKSPACE"), color);
+        let mut color = get_backspace_key_fill_color(dark, status);
+        color = utils::animate_color(ui.ctx(), format!("key{}f", "BACKSPACE"), color);
         if response.hovered() {
             color = color.linear_multiply(0.8);
         }
@@ -216,15 +305,12 @@ fn backspace_key(ui: &mut egui::Ui, status: &GameStatus, x: f32, y: f32) -> bool
                 } else {
                     0.8
                 },
-            family: FontFamily::Proportional,
+            family: FontFamily::Name("SF".into()),
         },
         utils::animate_color(
-            ui,
+            ui.ctx(),
             format!("key{}t", "BACKSPACE"),
-            match status {
-                GameStatus::Going => colors::BLACK,
-                GameStatus::Won(_) | GameStatus::Failed(_) => colors::WHITE,
-            },
+            get_backspace_key_text_color(dark, status),
         ),
     );
 
@@ -235,6 +321,7 @@ fn backspace_key(ui: &mut egui::Ui, status: &GameStatus, x: f32, y: f32) -> bool
 /// Returns which key is pressed
 pub fn keyboard(
     ui: &mut egui::Ui,
+    dark: bool,
     alphabet: &Alphabet,
     status: &GameStatus,
     valid: bool,
@@ -268,18 +355,19 @@ pub fn keyboard(
             // Detect keystroke
             match c {
                 ENTER => {
-                    if enter_key(ui, status, valid, x, y) {
+                    if enter_key(ui, dark, status, valid, x, y) {
                         pressed = Some(c)
                     }
                 }
                 BACKSPACE => {
-                    if backspace_key(ui, status, x, y) {
+                    if backspace_key(ui, dark, status, x, y) {
                         pressed = Some(c)
                     }
                 }
                 _ => {
                     if letter_key(
                         ui,
+                        dark,
                         c,
                         &alphabet[game::get_index(c.to_ascii_lowercase())],
                         x,

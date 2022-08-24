@@ -7,6 +7,7 @@ mod keyboard;
 mod letter;
 mod metrics;
 mod utils;
+mod visuals;
 
 use crate::args::{self, Args};
 use crate::builtin_words;
@@ -49,8 +50,6 @@ impl Default for WordleApp {
 impl WordleApp {
     /// App initialization
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        cc.egui_ctx.set_visuals(egui::Visuals::light());
-
         // Load fonts
         let mut fonts = FontDefinitions::default();
 
@@ -70,9 +69,18 @@ impl WordleApp {
 
         fonts
             .families
+            .insert(FontFamily::Name("SF".into()), vec!["SF".to_string()]);
+
+        fonts.font_data.insert(
+            "SF_R".to_string(),
+            FontData::from_static(include_bytes!("../assets/SF-Pro-Display-Regular.otf")),
+        );
+
+        fonts
+            .families
             .get_mut(&FontFamily::Proportional)
             .unwrap()
-            .insert(0, "SF".to_string());
+            .insert(0, "SF_R".to_string());
 
         cc.egui_ctx.set_fonts(fonts);
 
@@ -107,6 +115,9 @@ impl eframe::App for WordleApp {
 
     /// Update UI and handle input events
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Enable dark visuals in hard mode
+        ctx.set_visuals(visuals::get_visuals(ctx, self.args.difficult));
+
         // The header
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
@@ -124,8 +135,13 @@ impl eframe::App for WordleApp {
                 CollapsingHeader::new("Settings").show(ui, |ui| {
                     ui.set_max_width(200.0);
                     // TODO: unimplemented
-                    ui.add(Label::new("The settings will go into effect next game.").wrap(true));
-                    ui.checkbox(&mut self.args.difficult, "Hard Mode");
+                    // ui.add(Label::new("The settings will go into effect next game.").wrap(true));
+                    // Hard mode
+                    if ui.checkbox(&mut self.args.difficult, "Hard Mode").changed() {
+                        if let Some(ref mut game) = self.game {
+                            game.set_difficult(self.args.difficult);
+                        }
+                    }
                     ui.add(
                         Label::new("Any revealed hints must be used in subsequent guesses.")
                             .wrap(true),
@@ -137,7 +153,8 @@ impl eframe::App for WordleApp {
             Frame::window(ui.style()).show(ui, |ui| {
                 CollapsingHeader::new("Statistics").show(ui, |ui| {
                     // TODO: unimplemented
-                    ui.label("Ho");
+                    ui.set_max_width(200.0);
+                    ui.label("How about we explore the area ahead of us later?");
                 });
             });
 
@@ -175,6 +192,7 @@ impl eframe::App for WordleApp {
                         let status = guess.1[j];
                         letter(
                             ui,
+                            self.args.difficult,
                             i as i32,
                             j as i32,
                             &Letter {
@@ -186,6 +204,7 @@ impl eframe::App for WordleApp {
                         // We'll input words in this row, and the jth letter already input
                         letter(
                             ui,
+                            self.args.difficult,
                             i as i32,
                             j as i32,
                             &Letter {
@@ -197,6 +216,7 @@ impl eframe::App for WordleApp {
                         // Blank letter
                         letter(
                             ui,
+                            self.args.difficult,
                             i as i32,
                             j as i32,
                             &Letter {
@@ -211,6 +231,7 @@ impl eframe::App for WordleApp {
             // Render the keyboard and get keyboard input
             if let Some(key) = keyboard(
                 ui,
+                self.args.difficult,
                 game.get_alphabet(),
                 self.game_status.as_ref().unwrap(),
                 game.is_valid_guess(&self.guess.to_lowercase(), &self.word_list),

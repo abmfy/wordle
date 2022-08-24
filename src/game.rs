@@ -109,6 +109,11 @@ impl Game {
         &self.guesses
     }
 
+    // Setter for difficult
+    pub fn set_difficult(&mut self, difficult: bool) {
+        self.difficult = difficult;
+    }
+
     // Getter for alphabet
     pub fn get_alphabet(&self) -> &Alphabet {
         &&self.alphabet
@@ -133,35 +138,37 @@ impl Game {
 
         // Difficult mode check
         if self.difficult && self.get_round() > 0 {
-            let (last_guess, last_status) = self.guesses.last().unwrap();
+            // Check all guesses because in GUI mode the user may switch between
+            // difficult mode and normal mode several times.
+            for (guess, status) in &self.guesses {
+                let mut guess_counter = Counter::new();
+                word.chars().for_each(|c| {
+                    count(&mut guess_counter, c);
+                });
 
-            let mut guess_counter = Counter::new();
-            word.chars().for_each(|c| {
-                count(&mut guess_counter, c);
-            });
+                // Count the occurrence of yellow and green letters for check
+                let mut last_guess_counter = Counter::new();
 
-            // Count the occurrence of yellow and green letters for check
-            let mut last_guess_counter = Counter::new();
-
-            for ((i, last_letter), now_letter) in last_guess.chars().enumerate().zip(word.chars()) {
-                match last_status[i] {
-                    LetterStatus::Green => {
-                        // Green letters must stay green
-                        if now_letter != last_letter {
-                            return Err(Error::HintUnused);
+                for ((i, last_letter), now_letter) in guess.chars().enumerate().zip(word.chars()) {
+                    match status[i] {
+                        LetterStatus::Green => {
+                            // Green letters must stay green
+                            if now_letter != last_letter {
+                                return Err(Error::HintUnused);
+                            }
+                            count(&mut last_guess_counter, last_letter);
                         }
-                        count(&mut last_guess_counter, last_letter);
+                        LetterStatus::Yellow => {
+                            count(&mut last_guess_counter, last_letter);
+                        }
+                        _ => (),
                     }
-                    LetterStatus::Yellow => {
-                        count(&mut last_guess_counter, last_letter);
-                    }
-                    _ => (),
                 }
-            }
 
-            for (letter, count) in &last_guess_counter {
-                if guess_counter.get(letter).unwrap_or(&0) < count {
-                    return Err(Error::HintUnused);
+                for (letter, count) in &last_guess_counter {
+                    if guess_counter.get(letter).unwrap_or(&0) < count {
+                        return Err(Error::HintUnused);
+                    }
                 }
             }
         }
