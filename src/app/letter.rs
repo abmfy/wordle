@@ -92,7 +92,7 @@ fn get_expected_height(ui: &egui::Ui) -> f32 {
 
 /// How many height is available for use after allocation to header and keyboard
 fn get_available_height(ui: &egui::Ui) -> f32 {
-    let keyboard_height = (metrics::KEYBAORD_ROWS as f32
+    let keyboard_height = (metrics::KEYBOARD_ROWS as f32
         * (metrics::KEY_HEIGHT + metrics::KEY_V_MARGIN)
         + metrics::KEY_V_MARGIN)
         * keyboard::get_keyboard_size_factor(ui);

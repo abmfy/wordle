@@ -18,7 +18,7 @@ pub const LETTER_STROKE: f32 = 2.0;
 pub const HEADING_GRID_GAP: f32 = 2.0 * LETTER_MARGIN;
 
 // How many rows are there in the keyboard
-pub const KEYBAORD_ROWS: i32 = 3;
+pub const KEYBOARD_ROWS: i32 = 3;
 
 // Metrics about how to render a key
 pub const KEY_WIDTH: f32 = 43.0;

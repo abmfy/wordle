@@ -1,4 +1,4 @@
-use egui::{CollapsingHeader, FontData, FontDefinitions, FontFamily, Frame, Label, RichText};
+use egui::{FontData, FontDefinitions, FontFamily, RichText};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
@@ -7,6 +7,7 @@ mod grid;
 mod keyboard;
 mod letter;
 mod metrics;
+mod settings;
 mod stats;
 mod utils;
 mod visuals;
@@ -18,6 +19,7 @@ use crate::stats::Stats;
 
 use grid::grid;
 use keyboard::keyboard;
+use settings::settings;
 use stats::stats;
 
 /// App state persistence
@@ -92,6 +94,14 @@ impl WordleApp {
             Default::default()
         };
 
+        // Load default args
+        if app.args.seed.is_none() {
+            app.args.seed = Some(args::DEFAULT_SEED);
+        }
+        if app.args.day.is_none() {
+            app.args.day = Some(args::DEFAULT_DAY - 1);
+        }
+
         // Load word lists
         app.word_list = builtin_words::ACCEPTABLE
             .iter()
@@ -102,17 +112,28 @@ impl WordleApp {
             .map(|s| s.to_uppercase())
             .collect();
 
-        let mut rng =
-            rand::rngs::StdRng::seed_from_u64(app.args.seed.unwrap_or(args::DEFAULT_SEED));
+        app.shuffle_answer_list(app.args.seed.unwrap());
 
-        app.answer_list.shuffle(&mut rng);
+        // Start a new game when first run
+        if app.game.is_none() {
+            app.start();
+        }
 
         app
     }
 
-    /// Start a new game
+    /// Shuffle the answer list
+    fn shuffle_answer_list(&mut self, seed: u64) {
+        // Sort the answer list first to produce reproducible results
+        self.answer_list.sort();
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        self.answer_list.shuffle(&mut rng);
+    }
+
+    /// Start a new game at specified day
     fn start(&mut self) {
-        let mut day = self.args.day.unwrap_or(0);
+        let day = self.args.day.unwrap();
 
         self.game = Game::new(
             &self.answer_list[day as usize],
@@ -121,13 +142,19 @@ impl WordleApp {
         )
         .ok();
 
+        self.game_status = Some(GameStatus::Going);
+
+        self.guess.clear();
+    }
+
+    /// Increase the day count
+    fn another_day(&mut self) {
+        let mut day = self.args.day.unwrap();
         // Yet another day of playing wordle...
         // The mod is here to avoid overflow
         day += 1;
         day %= self.answer_list.len() as u32;
         self.args.day = Some(day);
-
-        self.game_status = Some(GameStatus::Going);
     }
 }
 
@@ -155,31 +182,10 @@ impl eframe::App for WordleApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // Setting panel
-            Frame::window(ui.style()).show(ui, |ui| {
-                CollapsingHeader::new("Settings  ").show(ui, |ui| {
-                    ui.set_max_width(200.0);
-                    // TODO: unimplemented
-                    // ui.add(Label::new("The settings will go into effect next game.").wrap(true));
-                    // Hard mode
-                    if ui.checkbox(&mut self.args.difficult, "Hard Mode").changed() {
-                        if let Some(ref mut game) = self.game {
-                            game.set_difficult(self.args.difficult);
-                        }
-                    }
-                    ui.add(
-                        Label::new("Any revealed hints must be used in subsequent guesses.")
-                            .wrap(true),
-                    );
-                });
-            });
+            settings(ui, self);
 
             // Stats panel
             stats(ui, self.args.difficult, &self.stats);
-
-            // Start a new game
-            if self.game.is_none() {
-                self.start();
-            }
 
             // We are in a game now
             let game = self.game.as_mut().unwrap();
@@ -236,9 +242,10 @@ impl eframe::App for WordleApp {
                         }
                     }
                 } else {
-                    // When game overed use either ENTER or BACKSPACE to restart
+                    // When game overed use either ENTER or BACKSPACE to start a new game
                     if key == keyboard::BACKSPACE || key == keyboard::ENTER {
-                        self.game = None;
+                        self.another_day();
+                        self.start();
                     }
                 }
             }

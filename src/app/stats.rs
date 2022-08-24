@@ -11,7 +11,7 @@ pub fn stats(ui: &mut egui::Ui, dark: bool, stats: &Stats) {
             ui.set_max_width(200.0);
 
             ui.label(
-                RichText::new(format!("Wins: {}", stats.get_wins()))
+                RichText::new(format!("Wins:  {}", stats.get_wins()))
                     .strong()
                     .color(if dark {
                         colors::GREEN
@@ -29,12 +29,12 @@ pub fn stats(ui: &mut egui::Ui, dark: bool, stats: &Stats) {
                     }),
             );
             ui.label(
-                RichText::new(format!("Average tries: {}", stats.get_average_tries())).strong(),
+                RichText::new(format!("Average tries: {:.2}", stats.get_average_tries())).strong(),
             );
 
             ui.label("");
 
-            ui.label(RichText::new(format!("Favotite words:")).strong());
+            ui.label(RichText::new(format!("Favorite words:")).strong());
             for (word, times) in stats.get_favorite_words() {
                 ui.label(format!("{word}: used {times} times"));
             }
