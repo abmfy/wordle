@@ -4,6 +4,16 @@ pub const PADDING: f32 = 12.0;
 // The height of the top panel of the app
 pub const HEADER_HEIGHT: f32 = 76.0;
 
+// The font size of the panel title
+pub const PANEL_TITLE_FONT_SIZE: f32 = 18.0;
+
+// Metrics about a panel
+pub const PANEL_WIDTH: f32 = 200.0;
+pub const PANEL_HEIGHT: f32 = 400.0;
+
+// The margin between panels
+pub const PANEL_MARGIN: f32 = 8.0;
+
 // How many rows and columns are there in the letter grid
 pub const ROWS: i32 = 6;
 pub const COLUMNS: i32 = 5;

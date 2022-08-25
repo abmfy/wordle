@@ -1,4 +1,4 @@
-use egui::{FontData, FontDefinitions, FontFamily, RichText};
+use egui::{FontData, FontDefinitions, FontFamily, Frame, Pos2, RichText, Window};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
@@ -183,14 +183,40 @@ impl eframe::App for WordleApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Setting panel
-            settings(ui, self);
+            // Use a window to contain the panels on a phone
+            if utils::is_phone(ui) {
+                Window::new(RichText::new("Explore").size(metrics::PANEL_TITLE_FONT_SIZE))
+                    .auto_sized()
+                    .fixed_pos(Pos2 {
+                        x: metrics::PADDING,
+                        y: metrics::HEADER_HEIGHT + metrics::PANEL_MARGIN,
+                    })
+                    .show(ui.ctx(), |ui| {
+                        // Setting panel
+                        settings(ui, self);
 
-            // Stats panel
-            stats(ui, self.args.difficult, &self.stats);
+                        // Stats panel
+                        stats(ui, self.args.difficult, &self.stats);
 
-            // Definition panel
-            definition(ui, self);
+                        // Definition panel
+                        definition(ui, self);
+                    });
+            } else {
+                // Setting panel
+                Frame::window(ui.style()).show(ui, |ui| {
+                    settings(ui, self);
+                });
+
+                // Stats panel
+                Frame::window(ui.style()).show(ui, |ui| {
+                    stats(ui, self.args.difficult, &self.stats);
+                });
+
+                // Definition panel
+                Frame::window(ui.style()).show(ui, |ui| {
+                    definition(ui, self);
+                });
+            }
 
             // We are in a game now
             let game = self.game.as_mut().unwrap();

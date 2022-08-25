@@ -1,5 +1,7 @@
 use egui::{Color32, Id};
 
+use super::keyboard;
+
 /// Get the width of the screen
 pub fn get_screen_width(ui: &egui::Ui) -> f32 {
     ui.input().screen_rect.width()
@@ -8,6 +10,11 @@ pub fn get_screen_width(ui: &egui::Ui) -> f32 {
 /// Get the height of the screen
 pub fn get_screen_height(ui: &egui::Ui) -> f32 {
     ui.input().screen_rect.height()
+}
+
+/// Check if the device is a phone
+pub fn is_phone(ui: &egui::Ui) -> bool {
+    return keyboard::get_keyboard_size_factor(ui) < 1.0;
 }
 
 // Make a smooth transition when color changes
