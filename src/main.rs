@@ -1,14 +1,18 @@
+#[cfg(not(target_arch = "wasm32"))]
 use clap::Parser;
+#[cfg(not(target_arch = "wasm32"))]
 use console;
+#[cfg(not(target_arch = "wasm32"))]
 use rand::{seq::SliceRandom, SeedableRng};
+#[cfg(not(target_arch = "wasm32"))]
 use std::{
     collections::HashSet,
     env,
-    fs::File,
-    io::{self, Read, Write},
-    path::PathBuf,
+    io::{self, Write},
     process,
 };
+
+use std::{fs::File, path::PathBuf, io::Read};
 
 mod app;
 mod args;
@@ -18,12 +22,17 @@ mod game;
 mod stats;
 
 use app::WordleApp;
+#[cfg(not(target_arch = "wasm32"))]
 use args::Args;
+#[cfg(not(target_arch = "wasm32"))]
 use dict::DICT;
+#[cfg(not(target_arch = "wasm32"))]
 use game::{Error, Game, GameStatus, GuessStatus, LetterStatus};
+#[cfg(not(target_arch = "wasm32"))]
 use stats::Stats;
 
 /// Read a line, trimmed. Return None if EOF encountered
+#[cfg(not(target_arch = "wasm32"))]
 fn read_line() -> Option<String> {
     let mut line = String::new();
     match io::stdin().read_line(&mut line) {
@@ -44,11 +53,13 @@ fn read_word_list(path: &PathBuf) -> Vec<String> {
 }
 
 /// Flush the output
+#[cfg(not(target_arch = "wasm32"))]
 fn flush() {
     io::stdout().flush().unwrap();
 }
 
 /// Print an error message
+#[cfg(not(target_arch = "wasm32"))]
 fn print_error(is_tty: bool, error: &Error) {
     if is_tty {
         println!("{}", console::style(error.what()).bold().red());
@@ -58,11 +69,13 @@ fn print_error(is_tty: bool, error: &Error) {
 }
 
 /// Print status of letters, in non-tty mode
+#[cfg(not(target_arch = "wasm32"))]
 fn print_status(status: &[LetterStatus]) {
     print!("{}", String::from_iter(status.iter().map(|s| s.to_char())));
 }
 
 /// Print guess history, in tty mode
+#[cfg(not(target_arch = "wasm32"))]
 fn print_guess_history(guesses: &Vec<(String, GuessStatus)>) {
     for i in 0..6 {
         if i < guesses.len() {
@@ -77,6 +90,7 @@ fn print_guess_history(guesses: &Vec<(String, GuessStatus)>) {
 }
 
 /// Print the alphabet, in tty mode
+#[cfg(not(target_arch = "wasm32"))]
 fn print_alphabet(alphabet: &[LetterStatus]) {
     const ROW1: &str = "QWERTYUIOP";
     const ROW2: &str = "ASDFGHJKL";
@@ -90,6 +104,7 @@ fn print_alphabet(alphabet: &[LetterStatus]) {
 }
 
 /// Exit game normally and provide a message if in tty mode
+#[cfg(not(target_arch = "wasm32"))]
 fn exit_game(is_tty: bool) -> ! {
     if is_tty {
         println!("{}", console::style("Goodbye!").bold().green());
@@ -98,6 +113,7 @@ fn exit_game(is_tty: bool) -> ! {
 }
 
 /// Exit game with error message and exit code 1
+#[cfg(not(target_arch = "wasm32"))]
 fn exit_with_error(is_tty: bool, message: &str) -> ! {
     if is_tty {
         println!("{}", console::style(message).bold().red());
@@ -108,8 +124,6 @@ fn exit_with_error(is_tty: bool, message: &str) -> ! {
 /// The main function for the Wordle game, for native run
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    use rand::Rng;
-
     let is_tty = atty::is(atty::Stream::Stdout);
 
     let mut args = Args::parse();
@@ -301,15 +315,7 @@ fn main() {
 
             // Get hint
             if word == "HINT" {
-                let mut rng = rand::thread_rng();
-                let hint = loop {
-                    let index = rng.gen_range(0..word_list.len());
-                    let word = &word_list[index];
-                    if game.validate_guess(true, true, word, &word_list).is_ok() {
-                        break word;
-                    }
-                };
-
+                let hint = game.get_hint(&word_list);
                 println!("{}", console::style(hint).bold().blue());
                 continue;
             }

@@ -1,8 +1,9 @@
-use std::{
-    fs::File,
-    io::Read,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::{path::Path};
+
+use std::{fs::File, io::Read};
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -80,6 +81,7 @@ pub struct Args {
 }
 
 impl Args {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load_defaults(path: &Path) -> Result<Args, ()> {
         let mut contents = String::new();
         if let Ok(mut file) = File::open(path) {
@@ -95,6 +97,7 @@ impl Args {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn validate_word_list(&self) -> Result<(), String> {
         if self.final_set.is_some() {
             if let Err(message) =
@@ -113,6 +116,7 @@ impl Args {
         Ok(())
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn validate(&self, answer_list: &Vec<String>) -> Result<(), String> {
         if let Some(day) = self.day {
             if day == 0 {

@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
+#[cfg(not(target_arch = "wasm32"))]
 use console::Color;
+#[cfg(not(target_arch = "wasm32"))]
 use console::StyledObject;
+use rand::Rng;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -19,6 +22,7 @@ pub enum Error {
 
 impl Error {
     /// Get what happened
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn what(&self) -> String {
         match self {
             Self::UnexpectedWordLength => format!("The length of a word should be {WORD_LENGTH}."),
@@ -40,6 +44,7 @@ pub enum LetterStatus {
 }
 
 impl LetterStatus {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn to_char(&self) -> char {
         match self {
             Self::Unknown => 'X',
@@ -50,6 +55,7 @@ impl LetterStatus {
     }
 
     // Render letter c with the color of this status
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn colored_char(&self, c: char) -> StyledObject<char> {
         console::style(c).fg(match self {
             // Gray
@@ -126,6 +132,18 @@ impl Game {
     /// Getter for alphabet
     pub fn get_alphabet(&self) -> &Alphabet {
         &&self.alphabet
+    }
+
+    /// Get a hint
+    pub fn get_hint(&self, word_list: &Vec<String>) -> String {
+        let mut rng = rand::thread_rng();
+        loop {
+            let index = rng.gen_range(0..word_list.len());
+            let word = &word_list[index];
+            if self.validate_guess(true, true, word, &word_list).is_ok() {
+                break word.to_string()
+            }
+        }
     }
 
     /// Check whether a word can make a valid guess

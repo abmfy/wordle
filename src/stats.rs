@@ -1,10 +1,13 @@
 use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+#[cfg(not(target_arch = "wasm32"))]
 use serde_json::json;
 
+#[cfg(not(target_arch = "wasm32"))]
 use super::game::GuessStatus;
 
 /// Counter for counting words usage
@@ -37,6 +40,7 @@ pub struct State {
 
 impl Stats {
     /// Return an initial state of stats
+    #[cfg(not(target_arch = "wasm32"))]
     fn default() -> Self {
         Self {
             wins: 0,
@@ -50,6 +54,7 @@ impl Stats {
 
     /// Initialize statistics from scratch or from JSON file.
     /// Return None if 'state.json' is in invalid format
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(state_path: &Option<PathBuf>) -> Option<Self> {
         let use_state = state_path.is_some();
         // Use state mode
@@ -127,6 +132,7 @@ impl Stats {
     }
 
     /// Save stats to specified path
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn save(&mut self) {
         let state = State {
             total_rounds: Some((self.wins + self.fails) as u32),
@@ -141,6 +147,7 @@ impl Stats {
     }
 
     /// Update stats of the guesses
+    #[cfg(not(target_arch = "wasm32"))]
     fn update_guesses(&mut self, guesses: &Vec<(String, GuessStatus)>, answer: &String) {
         let mut words: Vec<String> = vec![];
         for (word, _) in guesses {
@@ -162,6 +169,7 @@ impl Stats {
     }
 
     /// Won a game, update stats
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn win(&mut self, save: bool, guesses: &Vec<(String, GuessStatus)>) {
         self.win_with_guesses_updated(guesses.len());
         self.update_guesses(guesses, &guesses.last().unwrap().0);
@@ -178,6 +186,7 @@ impl Stats {
     }
 
     /// Failed a game, update stats
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn fail(&mut self, save: bool, guesses: &Vec<(String, GuessStatus)>, answer: &String) {
         self.fails += 1;
         self.update_guesses(guesses, answer);
@@ -187,6 +196,7 @@ impl Stats {
     }
 
     /// Print statistics in tty mode
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn print(&self, is_tty: bool) {
         let average_tries = self.get_average_tries();
 

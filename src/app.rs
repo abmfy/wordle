@@ -232,7 +232,15 @@ impl eframe::App for WordleApp {
                 self.game_status.as_ref().unwrap(),
                 game.validate_guess(self.args.difficult, false, &self.guess, &self.word_list)
                     .is_ok(),
+                self.guess == "HINT"
             ) {
+                // Check if hint button is hit
+                if self.guess == "HINT" && key == keyboard::ENTER {
+                    self.guess = game.get_hint(&self.word_list).to_string();
+                    // Prevent further processing because if not,
+                    // the hint will be submitted immediately
+                    return;
+                }
                 if self.game_status == Some(GameStatus::Going) {
                     match key {
                         // Guess

@@ -55,8 +55,11 @@ fn get_key_text_color(dark: bool, status: &LetterStatus) -> Color32 {
     }
 }
 
-fn get_enter_key_fill_color(dark: bool, status: &GameStatus, valid: bool) -> Color32 {
+fn get_enter_key_fill_color(dark: bool, status: &GameStatus, valid: bool, hint: bool) -> Color32 {
     if dark {
+        if hint {
+            return colors::DARK_MODE_GREEN;
+        }
         match status {
             GameStatus::Going => {
                 if valid {
@@ -69,6 +72,9 @@ fn get_enter_key_fill_color(dark: bool, status: &GameStatus, valid: bool) -> Col
             GameStatus::Failed(_) => colors::DARK_MODE_YELLOW,
         }
     } else {
+        if hint {
+            return colors::GREEN;
+        }
         match status {
             GameStatus::Going => {
                 if valid {
@@ -83,8 +89,11 @@ fn get_enter_key_fill_color(dark: bool, status: &GameStatus, valid: bool) -> Col
     }
 }
 
-fn get_enter_key_text_color(dark: bool, status: &GameStatus, valid: bool) -> Color32 {
+fn get_enter_key_text_color(dark: bool, status: &GameStatus, valid: bool, hint: bool) -> Color32 {
     if dark {
+        if hint {
+            return colors::DARK_MODE_WHITE;
+        }
         match status {
             GameStatus::Going => {
                 if valid {
@@ -96,6 +105,9 @@ fn get_enter_key_text_color(dark: bool, status: &GameStatus, valid: bool) -> Col
             GameStatus::Won(_) | GameStatus::Failed(_) => colors::DARK_MODE_WHITE,
         }
     } else {
+        if hint {
+            return colors::WHITE;
+        }
         match status {
             GameStatus::Going => {
                 if valid {
@@ -203,6 +215,7 @@ fn enter_key(
     dark: bool,
     status: &GameStatus,
     valid: bool,
+    hint: bool,
     x: f32,
     y: f32,
 ) -> bool {
@@ -220,7 +233,7 @@ fn enter_key(
     // We need to sense click event when the input is valid
     let mut response = ui.allocate_rect(
         rect,
-        if valid {
+        if hint || valid {
             Sense::click()
         } else {
             Sense::hover()
@@ -229,9 +242,9 @@ fn enter_key(
 
     // Render different colors depending on cursor state
     let color = {
-        let mut color = get_enter_key_fill_color(dark, status, valid);
+        let mut color = get_enter_key_fill_color(dark, status, valid, hint);
         color = utils::animate_color(ui.ctx(), format!("key{}f", "ENTER"), color);
-        if valid {
+        if hint || valid {
             if response.hovered() {
                 color = color.linear_multiply(0.8);
             }
@@ -245,7 +258,7 @@ fn enter_key(
     // Change cursor style when hovered
     response = response.on_hover_cursor(match status {
         GameStatus::Going => {
-            if valid {
+            if hint || valid {
                 CursorIcon::PointingHand
             } else {
                 CursorIcon::NotAllowed
@@ -261,10 +274,14 @@ fn enter_key(
     ui.painter().text(
         rect.center(),
         Align2::CENTER_CENTER,
-        match status {
-            GameStatus::Going => "ENTER",
-            GameStatus::Won(_) => "Bravo!",
-            GameStatus::Failed(answer) => answer,
+        if hint {
+            "HINT!"
+        } else {
+            match status {
+                GameStatus::Going => "ENTER",
+                GameStatus::Won(_) => "BRAVO!",
+                GameStatus::Failed(answer) => answer,
+            }
         },
         egui::FontId {
             size: metrics::KEY_FONT_SIZE * factor,
@@ -273,7 +290,7 @@ fn enter_key(
         utils::animate_color(
             ui.ctx(),
             format!("key{}t", "ENTER"),
-            get_enter_key_text_color(dark, status, valid),
+            get_enter_key_text_color(dark, status, valid, hint),
         ),
     );
 
@@ -345,12 +362,15 @@ fn backspace_key(ui: &mut egui::Ui, dark: bool, status: &GameStatus, x: f32, y: 
 
 /// The keyboard widget
 /// Returns which key is pressed
+/// Params valid: Is this guess valid (if so, the enter button is enabled)
+/// Prams hint: Whether to show hint button
 pub fn keyboard(
     ui: &mut egui::Ui,
     dark: bool,
     alphabet: &Alphabet,
     status: &GameStatus,
     valid: bool,
+    hint: bool,
 ) -> Option<char> {
     let mut pressed: Option<char> = None;
 
@@ -384,7 +404,7 @@ pub fn keyboard(
             // Detect keystroke
             match c {
                 ENTER => {
-                    if enter_key(ui, dark, status, valid, x, y) {
+                    if enter_key(ui, dark, status, valid, hint, x, y) {
                         pressed = Some(c)
                     }
                 }
