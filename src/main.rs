@@ -13,11 +13,13 @@ use std::{
 mod app;
 mod args;
 mod builtin_words;
+mod dict;
 mod game;
 mod stats;
 
 use app::WordleApp;
 use args::Args;
+use dict::DICT;
 use game::{Error, Game, GameStatus, GuessStatus, LetterStatus};
 use stats::Stats;
 
@@ -328,6 +330,17 @@ fn main() {
                         print_status(alphabet);
                         println!("");
                     }
+
+                    // If the word is in the dictionary, print its definition
+                    let print_definition = |word| {
+                        if dict::DICT.contains_key(word) {
+                            println!("{}", console::style(format!("{word}:")).bold().blue());
+                            for (i, sense) in DICT.get(word).unwrap().iter().enumerate() {
+                                println!("{}", console::style(format!("    {}: {}", i + 1, sense)).green());
+                            }
+                        }
+                    };
+
                     // Handle win / fail
                     match game_status {
                         GameStatus::Won(round) => {
@@ -338,9 +351,11 @@ fn main() {
                                     console::style(format!("You won in {round} guesses!"))
                                         .bold()
                                         .magenta()
-                                )
+                                );
+
+                                print_definition(&guesses.last().unwrap().0);
                             } else {
-                                println!("CORRECT {round}")
+                                println!("CORRECT {round}");
                             };
                         }
                         GameStatus::Failed(answer) => {
@@ -351,9 +366,11 @@ fn main() {
                                     console::style(format!("You lose! The answer is: {}", answer))
                                         .bold()
                                         .red()
-                                )
+                                );
+
+                                print_definition(&answer);
                             } else {
-                                println!("FAILED {}", answer)
+                                println!("FAILED {}", answer);
                             };
                         }
                         GameStatus::Going => (),
