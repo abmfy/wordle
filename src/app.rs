@@ -3,6 +3,7 @@ use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
 mod colors;
+mod definition;
 mod grid;
 mod keyboard;
 mod letter;
@@ -17,6 +18,7 @@ use crate::builtin_words;
 use crate::game::{Game, GameStatus};
 use crate::stats::Stats;
 
+use definition::definition;
 use grid::grid;
 use keyboard::keyboard;
 use settings::settings;
@@ -186,6 +188,9 @@ impl eframe::App for WordleApp {
 
             // Stats panel
             stats(ui, self.args.difficult, &self.stats);
+
+            // Definition panel
+            definition(ui, self);
 
             // We are in a game now
             let game = self.game.as_mut().unwrap();

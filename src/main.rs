@@ -336,7 +336,10 @@ fn main() {
                         if dict::DICT.contains_key(word) {
                             println!("{}", console::style(format!("{word}:")).bold().blue());
                             for (i, sense) in DICT.get(word).unwrap().iter().enumerate() {
-                                println!("{}", console::style(format!("    {}: {}", i + 1, sense)).green());
+                                println!(
+                                    "{}",
+                                    console::style(format!("    {}: {}", i + 1, sense)).green()
+                                );
                             }
                         }
                     };

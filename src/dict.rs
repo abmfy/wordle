@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
-use std::collections::HashMap;
 use serde_json;
+use std::collections::HashMap;
 
 lazy_static! {
     pub static ref DICT: HashMap<String, Vec<String>> = {
