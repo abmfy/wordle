@@ -107,9 +107,9 @@ GUI 充分利用了回车键以及退格键进行信息展示与交互。例如�
 
 另外，GUI 对手机进行了一定的适配，能够在手机上正常游玩。在手机上运行时，三个面板区域将收纳到一个折叠按钮下避免遮挡字母矩阵：
 
-![Mobile](images/mobile.png)
+<img src="images/mobile.png" alt="Mobile Mode" style="zoom:33%;" />
 
-![Mobile Panel](images/mobile_panel.png)
+<img src="images/mobile_panel.png" alt="Mobile Mode Panel" style="zoom:33%;" />
 
 ## 提高要求实现
 
