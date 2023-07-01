@@ -34,19 +34,19 @@ Crate 层级下的模块（除 `app` 外）为 CLI 及 GUI 所共用，`app` 及
 
 直接启动程序将进入 CLI 交互模式。在此模式下将会首先要求玩家指定游戏的答案，然后开始一局 Wordle 游戏。
 
-![image-20220827下午34512932](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午34512932.png)
+![CLI](images/cli.png)
 
 交互模式下每次猜测后将会显示所有猜测的结果以及每个字母的状态。若输入 `HINT` 将能够获取一个提示：
 
-![image-20220827下午40409535](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午40409535.png)
+![Hint](images/hint.png)
 
 游戏结束后，将会得到单词的释义并询问是否进行下一局游戏。
 
-![image-20220827下午34535141](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午34535141.png)
+![Definition](images/definition.png)
 
 在 CLI 模式下，可以指定一些参数来自定义游戏体验。
 
-![image-20220827下午34547264](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午34547264.png)
+![CLI Options](images/options.png)
 
 | 参数                      | 子参数        | 作用                                               | 备注                                               |
 | ------------------------- | ------------- | -------------------------------------------------- | -------------------------------------------------- |
@@ -65,53 +65,51 @@ Crate 层级下的模块（除 `app` 外）为 CLI 及 GUI 所共用，`app` 及
 
 下面将展示一些命令行参数的功能以及对一些错误输入的检测。
 
-![image-20220827下午41320857](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午41320857.png)
+![Difficult Mode](images/difficult.png)
 
-![image-20220827下午41402605](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午41402605.png)
+![Statistics](images/stats.png)
 
 ### GUI
 
-GUI 既支持本地运行，也能通过编译到 WebAssembly 的方式在 Web 上运行。目前本项目暂时部署在[这里](http://zeus.net9.org:45443)
+GUI 既支持本地运行，也能通过编译到 WebAssembly 的方式在 Web 上运行。目前本项目部署在[这里](https://abmfy.github.io/wordle/)。
 
-。
-
-![image-20220827下午43230095](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午43230095.png)
+![GUI](images/gui.png)
 
 GUI 充分利用了回车键以及退格键进行信息展示与交互。例如，正常模式下，回车键不可被按下：
 
-![image-20220827下午43653555](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午43653555.png)
+![Enter Disabled](images/enter_disabled.png)
 
 只有在输入了 5 个字母并且单词在词库中时，回车键才会变为可用状态：
 
-![image-20220827下午43702436](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午43702436.png)
+![Enter Enabled](images/enter_enabled.png)
 
 游戏结束时，退格键将变为下一局按钮，且若没有猜对单词，回车键将会展示正确答案：
 
-![image-20220827下午43548359](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午43548359.png)
+![Enter With Answer](images/answer.png)
 
 设置面板提供了困难模式的切换以及随机种子、游戏天数的选取。值得一提的是，困难模式下 GUI 将转为深邃的暗黑模式：
 
-![image-20220827下午44027840](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午44027840.png)
+![Dark Mode](images/dark.png)
 
 在键盘区输入 `HINT`，回车键将变为提示按钮，点击即可获取提示：
 
-![image-20220827下午44154055](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午44154055.png)
+![Hint Button](images/hint_button.png)
 
-![image-20220827下午44158906](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午44158906.png)
+![Hint Shown](images/hint_got.png)
 
 统计面板将会展示统计数据：
 
-![image-20220827下午44300714](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午44300714.png)
+![Statistics Panel](images/stat_panel.png)
 
 释义面板将在游戏结束后展示单词的释义：
 
-![image-20220827下午44411536](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午44411536.png)
+![Definition Panel](images/def_panel.png)
 
 另外，GUI 对手机进行了一定的适配，能够在手机上正常游玩。在手机上运行时，三个面板区域将收纳到一个折叠按钮下避免遮挡字母矩阵：
 
-<img src="/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午44859157.png" alt="image-20220827下午44859157" style="zoom:33%;" />
+![Mobile](images/mobile.png)
 
-<img src="/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午44907767.png" alt="image-20220827下午44907767" style="zoom: 33%;" />
+![Mobile Panel](images/mobile_panel.png)
 
 ## 提高要求实现
 
@@ -137,7 +135,7 @@ GUI 充分利用了回车键以及退格键进行信息展示与交互。例如�
 
 开始实现提高部分时，我注意到 egui 能够同时编译到本地以及 WebAssembly，于是决定直接使用 egui 实现 GUI。刚开始的两三天，GUI 的开发进度其实是比较缓慢的，这是因为 egui 与大部分常见的 UI 框架不同，它是即时布局的，而且没有事件机制。这在带来了开发的快捷性的同时也带来了一个巨大的问题：它的布局能力相对较弱。因此在实现字母矩阵以及键盘时，我直接将它们按计算好的坐标绘制到屏幕上来解决布局问题。在探索了一天之后，我终于绘制了第一版的界面：
 
-![image-20220827下午54050542](/Users/abmfy/Library/Application Support/typora-user-images/image-20220827下午54050542.png)
+![First Edition of GUI](images/first_edition.png)
 
 如果只是要做一个「能玩」的 GUI 的话，其实也许并不需要这么久。开发过程中的大部分时间其实都花在了一些对细节的追求上：
 
